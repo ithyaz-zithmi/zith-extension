@@ -1,0 +1,43 @@
+{
+  "manifest_version": 3,
+  "name": "Freelancer Kit - ZithPort",
+  "version": "1.0",
+  "description": "Extract job details from Upwork and Freelancer, manage proposals, and act as a mini CRM tool.",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage"
+  ],
+  "externally_connectable": {
+    "matches": [
+      "http://localhost:3005/*",
+      "https://zithmi.zithspace.com/*"
+    ]
+  },
+  "host_permissions": [
+    "https://www.upwork.com/*",
+    "https://www.freelancer.com/*",
+    "http://localhost:5001/*",
+    "https://zithmi.zithspace.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Freelancer Kit"
+  },
+  "options_page": "options.html",
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.upwork.com/*",
+        "https://www.freelancer.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}
