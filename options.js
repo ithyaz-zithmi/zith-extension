@@ -1,4 +1,4 @@
-document.addEventListener('DOMContentLoaded', () => {
+﻿document.addEventListener('DOMContentLoaded', () => {
   const nameInput = document.getElementById('freelancerName');
   const skillsInput = document.getElementById('skills');
   const defaultTemplateSelect = document.getElementById('defaultTemplate');

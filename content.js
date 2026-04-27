@@ -1,4 +1,4 @@
-/**
+﻿/**
  * content.js
  * Extracts job details from Upwork job pages.
  */
@@ -99,7 +99,6 @@ const extractSkillsFromDocument = (selectors, excludeContext = null) => {
   // We only ignore these if we are NOT on a profile page
   const ignoreContainers = isProfilePage() ? '' : '.job-tile, [data-test="job-tile"], .air3-slider, .up-slider, .up-modal';
   
-  console.log(`Extracting skills from document. Profile Page: ${isProfilePage()}`);
 
   for (let sel of selectors) {
     try {
@@ -143,7 +142,6 @@ const extractSkillsFromDocument = (selectors, excludeContext = null) => {
     const host = window.location.hostname;
     
     if (host.includes('upwork.com')) {
-      console.log('Upwork profile fallback scan...');
       const allTokens = document.querySelectorAll('.air3-token, [data-test="skill"]');
       allTokens.forEach(el => {
         let text = el.innerText || el.textContent || '';
@@ -155,7 +153,6 @@ const extractSkillsFromDocument = (selectors, excludeContext = null) => {
     }
 
     if (host.includes('freelancer.com')) {
-      console.log('Freelancer profile fallback scan (Top skills)...');
       // 1. Find section by header text
       const headers = Array.from(document.querySelectorAll('h1, h2, h3, h4, h5, h6, fl-text, span, div.SectionTitle'));
       const skillsHeader = headers.find(h => {
@@ -204,14 +201,12 @@ const tryCacheUserSkills = () => {
     // FIX: If we are on a profile page, we SHOULD scan the modal! 
     const currentOverlay = isProfilePage() ? null : document.querySelector('.air3-slider, .up-slider, .up-modal, [role="dialog"], fl-modal, .JobDescription');
 
-    console.log(`Attempting to cache user skills for ${platform} (excluding overlay if present)...`);
     const skills = extractSkillsFromDocument(USER_SKILL_SELECTORS, currentOverlay);
     
     // Filter out common job-specific skills if found in the main content instead of sidebar
     const filteredSkills = skills.filter(s => s.length > 1 && s.length < 40);
 
     if (filteredSkills.length > 0) {
-        console.log(`Successfully cached ${platform} user skills (Count: ${filteredSkills.length}):`, filteredSkills);
         const storageKey = `cachedUserSkills_${platform}`;
         const update = {};
         update[storageKey] = filteredSkills;
@@ -420,7 +415,6 @@ const performUpworkExtraction = () => {
     
     if (typeEl) {
       const typeText = typeEl.innerText.toLowerCase();
-      console.log('Job type element found:', typeText);
       
       // Prioritize specific job types
       if (typeText.includes('full-time')) jobType = 'full-time';
@@ -440,14 +434,12 @@ const performUpworkExtraction = () => {
       else if (typeText.includes('/hour')) jobType = 'hourly';
       else if (typeText.includes('/hr')) jobType = 'hourly';
       
-      console.log('Detected job type from element:', jobType);
     }
     
     // Check labels for job type
     const jobTypeLabel = getByLabel('Job Type');
     if (jobTypeLabel !== 'N/A') {
       const labelText = jobTypeLabel.toLowerCase();
-      console.log(`Found Job Type label: ${jobTypeLabel}`);
       if (labelText.includes('full-time') || labelText.includes('full time')) jobType = 'full-time';
       else if (labelText.includes('hourly')) jobType = 'hourly';
       else if (labelText.includes('fixed') || labelText.includes('fixed-price')) jobType = 'fixed';
@@ -457,7 +449,6 @@ const performUpworkExtraction = () => {
     const projectTypeLabel = getByLabel('Project Type');
     if (projectTypeLabel !== 'N/A') {
       const labelText = projectTypeLabel.toLowerCase();
-      console.log(`Found Project Type label: ${projectTypeLabel}`);
       
       if (labelText.includes('ongoing')) projectTypeFromLabel = 'ongoing';
       else if (labelText.includes('long-term')) projectTypeFromLabel = 'ongoing';
@@ -471,7 +462,6 @@ const performUpworkExtraction = () => {
       else if (labelText.includes('basic project')) projectTypeFromLabel = 'basic project';
       else {
         projectTypeFromLabel = projectTypeLabel.trim();
-        console.log(`Preserving custom project type: ${projectTypeFromLabel}`);
       }
     }
     
@@ -485,9 +475,6 @@ const performUpworkExtraction = () => {
       else if (contextText.includes('hourly')) jobType = 'hourly';
     }
     
-    console.log('=== FINAL JOB TYPE ===');
-    console.log('Final jobType:', jobType);
-    console.log('Final projectTypeFromLabel:', projectTypeFromLabel);
 
     // 5. BUDGET AND HOURLY RATE EXTRACTION (AFTER jobType detection)
     let budget = getText([
@@ -511,7 +498,6 @@ const performUpworkExtraction = () => {
       '.budget-info .amount', '.budget-info strong'
     ]);
     
-    console.log('Initial budget extraction:', budget);
 
     let hourlyRate = getText([
       '[data-test="hourly-rate"]', '[data-qa="hourly-rate"]',
@@ -520,7 +506,6 @@ const performUpworkExtraction = () => {
       'span[data-test="hourly-rate"]'
     ]);
     
-    console.log('Initial hourly rate extraction:', hourlyRate);
 
     // Highly aggressive regex fallback capturing monetary ranges or strings explicitly
     // ONLY if we still don't have a clear price
@@ -742,7 +727,6 @@ const performUpworkExtraction = () => {
 
     // 8. User Profile Skills (New: For DOM-based matching)
     const userSkills = getArray(USER_SKILL_SELECTORS);
-    console.log('Extracted User Skills from DOM durante extraction:', userSkills);
     if (userSkills.length > 0) {
       chrome.storage.local.set({ cachedUserSkills: userSkills });
     }
@@ -899,9 +883,9 @@ const performFreelancerExtraction = () => {
     // Aggressive regex fallback for budget
     if (rawBudget === 'n/a' || rawBudget.includes('0.00')) {
         const fullText = document.body.innerText;
-        // Search for ranges like "₹600.00 – 1,500.00 INR" or "$250 - $750 USD"
-        const rangeRegex = /([\₹\$€£]\s*[\d,.]+(?:\.\d{2})?\s*(?:–|-|to)\s*[\₹\$€£]?\s*[\d,.]+(?:\.\d{2})?\s*(?:INR|USD|EUR|GBP|AUD|CAD)?)/i;
-        const singleRegex = /([\₹\$€£]\s*[\d,.-]+\s*(?:INR|USD|EUR|GBP|AUD|CAD)?(?:\s*\/\s*hr|\s*per hour)?)/i;
+        // Search for ranges like "â‚¹600.00 â€“ 1,500.00 INR" or "$250 - $750 USD"
+        const rangeRegex = /([\â‚¹\$â‚¬Â£]\s*[\d,.]+(?:\.\d{2})?\s*(?:â€“|-|to)\s*[\â‚¹\$â‚¬Â£]?\s*[\d,.]+(?:\.\d{2})?\s*(?:INR|USD|EUR|GBP|AUD|CAD)?)/i;
+        const singleRegex = /([\â‚¹\$â‚¬Â£]\s*[\d,.-]+\s*(?:INR|USD|EUR|GBP|AUD|CAD)?(?:\s*\/\s*hr|\s*per hour)?)/i;
         
         const budgetMatch = fullText.match(rangeRegex) || fullText.match(singleRegex);
         if (budgetMatch && (!rawBudget.includes('0.00') || !budgetMatch[1].includes('0.00'))) {
@@ -1057,7 +1041,6 @@ const extractors = {
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "extractJob") {
     const platform = getPlatform();
-    console.log(`Extraction started for ${platform}...`);
 
     const extractor = extractors[platform] || (() => ({ error: 'Unknown platform' }));
 
@@ -1068,7 +1051,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     const isMissingCritical = (d) => !d || d.title === 'Title not found' || d.summary === 'Summary not found' || d.error;
 
     if (isMissingCritical(data) && platform !== 'unknown') {
-        console.log("Critical fields missing or error, retrying in 1000ms for hydration...");
         setTimeout(() => {
             data = extractor();
             sendResponse({ success: !data.error, data: data });
@@ -1080,13 +1062,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
   
   if (request.action === "syncUserSkills") {
-    console.log("Manual User Skills Sync Requested...");
     const currentOverlay = document.querySelector('.air3-slider, .up-slider, .up-modal, [role="dialog"]');
     const skills = extractSkillsFromDocument(USER_SKILL_SELECTORS, currentOverlay);
     
     if (skills.length > 0) {
         chrome.storage.local.set({ cachedUserSkills: skills }, () => {
-            console.log("Manual Sync Success:", skills);
             sendResponse({ 
                 success: true, 
                 count: skills.length, 
@@ -1095,7 +1075,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             });
         });
     } else {
-        console.warn("Manual Sync Failed: No skills found.");
         sendResponse({ success: false, error: "No skills found in sidebar. Please ensure your profile is visible." });
     }
     return true;

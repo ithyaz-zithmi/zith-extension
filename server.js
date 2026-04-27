@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
@@ -8,9 +9,19 @@ const { CONFIG } = require('./config.js');
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 const app = express();
-const PORT = CONFIG.PORT;
-const JWT_SECRET = CONFIG.JWT_SECRET;
-const GEMINI_API_KEY = CONFIG.GEMINI_API_KEY;
+const PORT = process.env.PORT || CONFIG.PORT || 5001;
+const JWT_SECRET = process.env.JWT_SECRET;
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+
+if (!JWT_SECRET) {
+  console.error('FATAL: JWT_SECRET is not set. Create a .env file from .env.example');
+  process.exit(1);
+}
+
+if (!GEMINI_API_KEY) {
+  console.error('FATAL: GEMINI_API_KEY is not set. Create a .env file from .env.example');
+  process.exit(1);
+}
 
 app.use(cors());
 app.use(express.json());
@@ -24,13 +35,11 @@ const authenticateToken = (req, res, next) => {
   const token = authHeader && authHeader.split(' ')[1];
 
   if (!token || token === 'undefined' || token === 'null') {
-    console.log('Auth Failed: No valid token found in header');
     return res.status(401).json({ message: 'No token provided' });
   }
 
   jwt.verify(token, JWT_SECRET, (err, user) => {
     if (err) {
-      console.log('Auth Failed: Invalid/Expired token');
       return res.status(403).json({ message: 'Invalid token' });
     }
     req.user = user;
@@ -44,14 +53,15 @@ const authenticateToken = (req, res, next) => {
  */
 app.post('/api/auth/login', (req, res) => {
   const { email, password } = req.body;
-  console.log(`Login attempt for ${email}`);
-  
-  // High-five mock login - always succeeds for testing!
-  // Generate a mock tenant ID based on the email domain or a static UUID if preferred
-  const mockTenantId = Buffer.from(email).toString('hex').substring(0, 12); 
+
+  if (!email || !password) {
+    return res.status(400).json({ success: false, message: 'Email and password are required' });
+  }
+
+  const mockTenantId = Buffer.from(email).toString('hex').substring(0, 12);
   const user = { id: 'u123', email, name: 'Test User', tenantId: mockTenantId };
   const accessToken = jwt.sign(user, JWT_SECRET, { expiresIn: '24h' });
-  
+
   res.json({ success: true, accessToken, user });
 });
 
@@ -72,16 +82,11 @@ app.get('/api/auth/check', authenticateToken, (req, res) => {
 app.post('/api/jobs', authenticateToken, async (req, res) => {
   try {
     const jobData = req.body;
-    const userId = req.user.id;
-
-    console.log(`Saving job for user ${userId}:`, jobData.title);
 
     // TODO: Insert jobData into your database (MongoDB, PostgreSQL, etc.)
-    // Example: await db.jobs.insertOne({ ...jobData, userId, syncedAt: new Date() });
 
     res.status(201).json({ success: true, message: 'Job synced successfully' });
   } catch (error) {
-    console.error('Save Job Error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 });
@@ -93,27 +98,16 @@ app.post('/api/jobs', authenticateToken, async (req, res) => {
 app.post('/api/leads', authenticateToken, async (req, res) => {
   try {
     const leadData = req.body;
-    const tenantId = req.headers['x-tenant-id'];
-    const userId = req.user.id;
 
-    console.log('=== LEAD SYNC RECEIVED ===');
-    console.log('User ID:', userId);
-    console.log('Tenant:', tenantId);
-    console.log('Title:', leadData.title);
-    console.log('AI Summary:', leadData.ai_summary ? 'PRESENT' : 'MISSING');
-    console.log('Internal Notes:', leadData.internalNotes);
-    console.log('Skill Analysis:', leadData.skillAnalysis ? `Match: ${leadData.skillAnalysis.matchPercentage}%` : 'N/A');
-    
     // In a real app, you would save this to your database
     // Example: await Lead.create(leadData);
 
-    res.status(201).json({ 
-      success: true, 
+    res.status(201).json({
+      success: true,
       message: 'Lead synchronized successfully',
-      data: { id: 'lead_' + Date.now() } // Mock lead ID
+      data: { id: 'lead_' + Date.now() }
     });
   } catch (error) {
-    console.error('Lead Sync Error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 });
@@ -123,10 +117,7 @@ app.post('/api/leads', authenticateToken, async (req, res) => {
  * GET /api/skills
  */
 app.get('/api/skills', authenticateToken, (req, res) => {
-  console.log('=== GET /api/skills REQUEST RECEIVED ===');
   const category = req.query.category;
-  console.log(`Fetching skills for user ${req.user.id}, category: ${category}`);
-
 
   // Mock skills dictionary
   const skillsMap = {
@@ -147,7 +138,7 @@ app.get('/api/skills', authenticateToken, (req, res) => {
  * Handle AI Generation (Summary or Proposal)
  * POST /api/generate
  */
-app.post('/api/generate', async (req, res) => {
+app.post('/api/generate', authenticateToken, async (req, res) => {
   try {
     const { type, text, job, settings, templateType } = req.body;
     let prompt = '';
@@ -175,21 +166,19 @@ app.post('/api/generate', async (req, res) => {
       try {
         // Clean up markdown if AI includes it
         let cleanedText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
-        // Sometimes Gemini returns a markdown list or just text, let's be extra careful
         if (cleanedText.startsWith('[') && cleanedText.endsWith(']')) {
           data = JSON.parse(cleanedText);
         } else {
-          // If not a JSON array, split by lines and filter
           data = cleanedText.split('\n').map(line => line.replace(/^[•\-\*]\s*/, '').trim()).filter(Boolean);
         }
       } catch (e) {
-        console.error("JSON Parse Error on Summary:", e);
+        // If parse fails, return raw text split by lines
+        data = responseText.split('\n').filter(Boolean);
       }
     }
 
     res.json({ success: true, data });
   } catch (error) {
-    console.error('AI Generation Error:', error);
     res.status(500).json({ message: 'AI Service Error' });
   }
 });

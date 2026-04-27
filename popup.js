@@ -1,7 +1,15 @@
-/**
+﻿/**
  * popup.js
  * State-driven UI for main extension and CRM views.
  */
+
+// HTML sanitization helper to prevent XSS
+function escapeHtml(str) {
+  if (!str) return '';
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
 
 // Authentication state
 let isAuthenticated = false;
@@ -10,7 +18,6 @@ let authFallbackTimer = null;
 
 // Check authentication on load
 function checkAuth() {
-  console.log('Checking authentication...');
 
   // First ensure Chrome storage is ready
   ensureStorageReady(() => {
@@ -24,11 +31,9 @@ function ensureStorageReady(callback) {
   // Check if storage is available and ready
   try {
     chrome.storage.local.getBytesInUse(null, (bytesInUse) => {
-      console.log('Storage is ready, bytes in use:', bytesInUse);
       callback();
     });
   } catch (error) {
-    console.log('Storage not ready, retrying...', error);
     setTimeout(() => {
       ensureStorageReady(callback);
     }, 100);
@@ -40,7 +45,6 @@ function checkAuthWithRetry(attempt) {
   const maxAttempts = 5;
   const delay = attempt * 200; // Exponential backoff: 0, 200, 400, 600, 800ms
 
-  console.log(`Auth check attempt ${attempt + 1}/${maxAttempts} with ${delay}ms delay`);
 
   setTimeout(() => {
     checkAuthFromMultipleSources(attempt, maxAttempts);
@@ -49,15 +53,11 @@ function checkAuthWithRetry(attempt) {
 
 // Check authentication from multiple storage sources with retry
 function checkAuthFromMultipleSources(attempt, maxAttempts) {
-  console.log('Checking auth from background script on attempt', attempt + 1);
 
   // First try background script storage
   chrome.runtime.sendMessage({ action: 'getAuth' }, (backgroundResult) => {
-    console.log('Background storage result:', backgroundResult);
-    console.log('Background storage keys:', Object.keys(backgroundResult));
 
     if (backgroundResult.authToken && backgroundResult.currentUser) {
-      console.log('Found credentials in background storage on attempt', attempt + 1);
 
       // Copy to popup local storage for faster access
       chrome.storage.local.set({
@@ -70,25 +70,17 @@ function checkAuthFromMultipleSources(attempt, maxAttempts) {
     }
 
     // If not found in background, try local storage
-    console.log('Not found in background storage, trying local storage...');
     chrome.storage.local.get(['authToken', 'currentUser'], (localResult) => {
-      console.log('Local storage result:', localResult);
-      console.log('Local storage keys:', Object.keys(localResult));
 
       if (localResult.authToken && localResult.currentUser) {
-        console.log('Found credentials in local storage on attempt', attempt + 1);
         proceedWithAuth(localResult.authToken, localResult.currentUser);
         return;
       }
 
       // If not found in local, try sync storage
-      console.log('Not found in local storage, trying sync storage...');
       chrome.storage.sync.get(['authToken', 'currentUser'], (syncResult) => {
-        console.log('Sync storage result:', syncResult);
-        console.log('Sync storage keys:', Object.keys(syncResult));
 
         if (syncResult.authToken && syncResult.currentUser) {
-          console.log('Found credentials in sync storage, copying to local...');
           // Copy to local storage for faster access
           chrome.storage.local.set({
             authToken: syncResult.authToken,
@@ -97,21 +89,17 @@ function checkAuthFromMultipleSources(attempt, maxAttempts) {
             proceedWithAuth(syncResult.authToken, syncResult.currentUser);
           });
         } else {
-          console.log('No credentials found in any storage on attempt', attempt + 1);
 
           // Retry if we haven't reached max attempts
           if (attempt < maxAttempts - 1) {
-            console.log('Retrying auth check...');
             checkAuthWithRetry(attempt + 1);
           } else {
-            console.log('Max retry attempts reached, trying aggressive check...');
             // Final aggressive check before showing login
             aggressiveStorageCheck();
 
             // Set a single centralized timer to show login if all checks fail
             if (authFallbackTimer) clearTimeout(authFallbackTimer);
             authFallbackTimer = setTimeout(() => {
-              console.log('Fallback: No auth found after exhaustive checks (3s), showing login');
               showLoginInterface();
             }, 3000); // Increased to 3s for slower storage/network
           }
@@ -123,8 +111,6 @@ function checkAuthFromMultipleSources(attempt, maxAttempts) {
 
 // Proceed with authentication after finding credentials
 function proceedWithAuth(token, user, isFreshLogin = false) {
-  console.log('Proceeding with auth, token preview:', token.substring(0, 20) + '...');
-  console.log('Is fresh login:', isFreshLogin);
 
   // Clear fallback timer immediately
   if (authFallbackTimer) {
@@ -139,20 +125,16 @@ function proceedWithAuth(token, user, isFreshLogin = false) {
 
   // Background validation (skip for fresh login)
   if (!isFreshLogin) {
-    console.log('Starting background token validation...');
     validateToken(token)
       .then(isValid => {
         if (!isValid) {
-          console.log('Background validation: Token invalid/expired, forcing logout');
           showToast('Session expired. Please log in again.');
           clearAllAuthData();
           showLoginInterface();
         } else {
-          console.log('Background validation: Token is valid');
         }
       })
       .catch(error => {
-        console.log('Background validation: Request failed, keeping current session:', error);
       });
   }
 }
@@ -173,10 +155,8 @@ async function validateToken(token) {
   try {
     const tenantId = extractTenantFromJWT(token);
     if (!tenantId) {
-      console.error('Token Validation: No tenant ID found in token');
       return false;
     }
-    console.log('Validating token for tenant:', tenantId);
 
     const response = await fetch(`${CONFIG.API_BASE_URL}/auth/check`, {
       method: 'GET',
@@ -189,24 +169,19 @@ async function validateToken(token) {
 
     const data = await response.json();
 
-    console.log('Token validation response:', data);
 
     if (response.status === 401) {
-      console.log('Token expired or invalid (401)');
       return false;
     }
 
     if (response.status === 403) {
-      console.log('Token forbidden (403)');
       return false;
     }
 
     return data.success;
   } catch (error) {
-    console.error('Token validation error:', error);
     // If network error, assume token is still valid to avoid unnecessary logouts
     if (error.name === 'TypeError' && error.message.includes('fetch')) {
-      console.log('Network error during token validation, assuming token is valid');
       return true; // Keep channel open for async response
     }
     return false;
@@ -232,23 +207,18 @@ function clearAllAuthData() {
 // Manual storage check for debugging
 function checkStorageManually() {
   chrome.storage.local.get(null, (allItems) => {
-    console.log('All storage items:', allItems);
-    console.log('Storage keys:', Object.keys(allItems));
   });
 
   chrome.storage.local.get(['authToken', 'currentUser'], (result) => {
-    console.log('Manual storage check:', result);
   });
 
   // Also check sync storage
   chrome.storage.sync.get(['authToken', 'currentUser'], (syncResult) => {
-    console.log('Manual sync storage check:', syncResult);
   });
 }
 
 // Aggressive fallback storage check
 function aggressiveStorageCheck() {
-  console.log('Performing aggressive storage check...');
 
   // Try multiple approaches
   const checks = [
@@ -267,17 +237,14 @@ function aggressiveStorageCheck() {
   checks.forEach((check, index) => {
     try {
       check((result) => {
-        console.log(`Aggressive check ${index + 1} result:`, result);
 
         // If we find auth data in any check, use it immediately
         if (result.authToken && result.currentUser && !found) {
           found = true;
-          console.log('Found auth data in aggressive check', index + 1);
           proceedWithAuth(result.authToken, result.currentUser);
         }
       });
     } catch (error) {
-      console.log('Aggressive check error:', error);
     }
   });
 }
@@ -315,7 +282,6 @@ function showToast(msg) {
     toast.classList.remove('hidden');
     setTimeout(() => toast.classList.add('hidden'), 3000);
   } else {
-    console.log('Toast:', msg); // Fallback to console if toast element not found
   }
 }
 
@@ -325,20 +291,17 @@ async function handleLogin(email, password) {
     const response = await fetch(`${CONFIG.API_BASE_URL}/auth/login`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'x-tenant-id': 'b85c1b5b-77a3-4281-9147-51d6bd3ee94d'
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({ email, password })
     });
 
     const data = await response.json();
-    console.log('Complete login response:', data);
 
     if (data.success) {
       isAuthenticated = true;
       currentUser = data.user;
 
-      console.log('Login successful, storing auth data:', {
         token: data.accessToken ? data.accessToken.substring(0, 20) + '...' : 'undefined',
         hasToken: !!data.accessToken,
         user: data.user
@@ -346,7 +309,6 @@ async function handleLogin(email, password) {
 
       // Store auth data only if token exists
       if (data.accessToken) {
-        console.log('Storing auth data via background script');
 
         // Store via background script for persistence
         chrome.runtime.sendMessage({
@@ -354,10 +316,8 @@ async function handleLogin(email, password) {
           token: data.accessToken,
           user: data.user
         }, (response) => {
-          console.log('Background storage response:', response);
 
           if (response && response.success) {
-            console.log('Auth data stored successfully via background');
 
             // Also store in popup storage for immediate access
             const authData = {
@@ -366,16 +326,13 @@ async function handleLogin(email, password) {
             };
 
             chrome.storage.local.set(authData, () => {
-              console.log('Auth data also stored in popup local storage');
               checkStorageManually();
             });
           } else {
-            console.error('Background storage failed');
             showLoginError('Login failed: Could not store authentication');
           }
         });
       } else {
-        console.error('No token received from backend, cannot store auth data');
         showLoginError('Login failed: No authentication token received');
         return;
       }
@@ -471,9 +428,9 @@ function scoreJob(job) {
 }
 
 function getScoreBadgeClass(score) {
-  if (score >= 80) return { class: 'score-high', text: '🟢 High Value' };
-  if (score >= 50) return { class: 'score-med', text: '🟡 Medium Value' };
-  return { class: 'score-low', text: '🔴 Low Value' };
+  if (score >= 80) return { class: 'score-high', text: 'ðŸŸ¢ High Value' };
+  if (score >= 50) return { class: 'score-med', text: 'ðŸŸ¡ Medium Value' };
+  return { class: 'score-low', text: 'ðŸ”´ Low Value' };
 }
 
 async function generateAIProposal(job, settings, templateType) {
@@ -491,7 +448,6 @@ async function generateAIProposal(job, settings, templateType) {
         resolve(response.data);
       } else {
         // Fallback to static builder if background AI fails or auth missing
-        console.warn("AI Generation failed, using static fallback:", response?.message);
         resolve(buildDynamicProposal(job, settings, templateType));
       }
     });
@@ -528,13 +484,10 @@ document.addEventListener('DOMContentLoaded', () => {
   let lastSavedLeadId = null;
 
   chrome.storage.local.get(['settings', 'authToken'], (result) => {
-    console.log('Popup - Storage result:', result);
-    console.log('Storage keys available:', Object.keys(result));
 
     const settings = result.settings || {};
     const authToken = result.authToken || null;
 
-    console.log('Popup - Auth check on load:', {
       hasToken: !!authToken,
       tokenLength: authToken ? authToken.length : 0,
       tokenStart: authToken ? authToken.substring(0, 20) + '...' : 'none',
@@ -656,7 +609,7 @@ document.addEventListener('DOMContentLoaded', () => {
         minute: 'numeric',
         hour12: true
       };
-      return date.toLocaleString('en-US', options).replace(',', ' ·');
+      return date.toLocaleString('en-US', options).replace(',', ' Â·');
     } catch (e) {
       return isoString;
     }
@@ -718,7 +671,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         // Still allow generating proposals
         if (generateBtn) {
-          generateBtn.innerText = "🚀 Generate Another Proposal";
+          generateBtn.innerText = "ðŸš€ Generate Another Proposal";
           generateBtn.disabled = false;
         }
       } else {
@@ -731,7 +684,7 @@ document.addEventListener('DOMContentLoaded', () => {
           saveBtn.style.opacity = '1';
         }
         if (generateBtn) {
-          generateBtn.innerText = "🚀 Generate Smart Proposal";
+          generateBtn.innerText = "ðŸš€ Generate Smart Proposal";
           generateBtn.disabled = false;
         }
       }
@@ -744,10 +697,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (statusBanner && data.validation) {
       const v = data.validation;
       let confClass = 'conf-high';
-      let icon = '✅';
+      let icon = 'âœ…';
       
-      if (v.confidence === 'medium') { confClass = 'conf-med'; icon = '⚠️'; }
-      if (v.confidence === 'low') { confClass = 'conf-low'; icon = '❌'; }
+      if (v.confidence === 'medium') { confClass = 'conf-med'; icon = 'âš ï¸'; }
+      if (v.confidence === 'low') { confClass = 'conf-low'; icon = 'âŒ'; }
       
       let missingTxt = '';
       if (v.missingFields && v.missingFields.length > 0) {
@@ -850,9 +803,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const projectTypeElement = document.getElementById('jobProjectTypeWrap');
     if (projectTypeElement) {
       projectTypeElement.innerText = `Type: ${projectTypeDisplay}`;
-      console.log('Updated project type display:', projectTypeDisplay);
     } else {
-      console.error('jobProjectTypeWrap element not found');
     }
 
     // Expanded Metadata
@@ -862,19 +813,19 @@ document.addEventListener('DOMContentLoaded', () => {
     // Custom logic for grid badge validations
     const payEl = document.getElementById('clientPaymentStat');
     if (data.clientPaymentVerified) { 
-      payEl.innerText = '✅ Verified'; 
+      payEl.innerText = 'âœ… Verified'; 
       payEl.className = 'detail-value verified'; 
     } else { 
-      payEl.innerText = '❌ Unverified'; 
+      payEl.innerText = 'âŒ Unverified'; 
       payEl.className = 'detail-value unverified'; 
     }
 
     const phoneEl = document.getElementById('clientPhoneStat');
     if (data.clientPhoneVerified) { 
-      phoneEl.innerText = '✅ Verified'; 
+      phoneEl.innerText = 'âœ… Verified'; 
       phoneEl.className = 'detail-value verified'; 
     } else { 
-      phoneEl.innerText = '❌ Unverified'; 
+      phoneEl.innerText = 'âŒ Unverified'; 
       phoneEl.className = 'detail-value unverified'; 
     }
 
@@ -934,10 +885,10 @@ document.addEventListener('DOMContentLoaded', () => {
         // Defensive check: ensure points is an array
         if (Array.isArray(points)) {
           // Join points with bullets and double newlines for better "pace"
-          aiInput.value = points.map(pt => `• ${pt}`).join('\n\n');
+          aiInput.value = points.map(pt => `â€¢ ${pt}`).join('\n\n');
         } else if (typeof points === 'string') {
           // If it's just a string, show it directly or split by common delimiters
-          aiInput.value = points.split('\n').filter(l => l.trim()).map(line => line.trim().startsWith('•') ? line : `• ${line}`).join('\n\n');
+          aiInput.value = points.split('\n').filter(l => l.trim()).map(line => line.trim().startsWith('â€¢') ? line : `â€¢ ${line}`).join('\n\n');
         } else {
           aiInput.value = String(points);
         }
@@ -948,7 +899,6 @@ document.addEventListener('DOMContentLoaded', () => {
         aiInput.style.height = (aiInput.scrollHeight) + 'px';
 
       }).catch((err) => {
-        console.error("AI Summary Error:", err);
         aiLoader.innerText = "Error parsing AI Summary. Ensure API constraints are valid.";
       });
     } else {
@@ -971,9 +921,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Use full date for postedTime if it looks like an ISO string
     if (data.postedOn && data.postedOn.includes('T') && data.postedOn.includes('Z')) {
-      document.getElementById('postedTime').innerText = `📅 ${formatFullDate(data.postedOn)}`;
+      document.getElementById('postedTime').innerText = `ðŸ“… ${formatFullDate(data.postedOn)}`;
     } else {
-      document.getElementById('postedTime').innerText = `📅 ${formatPostedDate(data.postedOn)}`;
+      document.getElementById('postedTime').innerText = `ðŸ“… ${formatPostedDate(data.postedOn)}`;
     }
 
     document.getElementById('proposalBox').classList.add('hidden');
@@ -1008,7 +958,7 @@ document.addEventListener('DOMContentLoaded', () => {
       ta.select();
       document.execCommand('copy');
       const originalText = copyBtn.innerText;
-      copyBtn.innerText = '✅ Copied!';
+      copyBtn.innerText = 'âœ… Copied!';
       setTimeout(() => copyBtn.innerText = originalText, 2000);
     });
   }
@@ -1073,7 +1023,6 @@ function normalizeUrl(url) {
       templateUsed: templateSelect.value
     };
 
-    console.log('Popup: Sending saveJob payload:', payload);
 
     chrome.runtime.sendMessage(payload, (resp) => {
       saveBtn.disabled = false; saveBtn.innerText = "Save Job & Proposal";
@@ -1121,32 +1070,32 @@ function normalizeUrl(url) {
         card.innerHTML = `
           <div style="display:flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
             <h3 style="margin: 0; line-height: 1.3;">
-              <a href="${job.jobLink || job.id}" target="_blank" style="text-decoration:none; color:inherit;">${job.title}</a>
+              <a href="${escapeHtml(job.jobLink || job.id)}" target="_blank" style="text-decoration:none; color:inherit;">${escapeHtml(job.title)}</a>
             </h3>
-            <div class="badge ${currentStatus.class}" style="white-space:nowrap; border-radius: 4px; font-size: 10px;">${currentStatus.label.toUpperCase()}</div>
+            <div class="badge ${currentStatus.class}" style="white-space:nowrap; border-radius: 4px; font-size: 10px;">${escapeHtml(currentStatus.label.toUpperCase())}</div>
           </div>
           
           <div style="display:flex; gap: 6px; flex-wrap:wrap; margin-bottom: 12px; align-items: center;">
              <span class="score-badge ${bdg.class}" style="font-size:10px; padding: 2px 6px;">${job.score || 0}</span>
-             <div class="badge" style="margin:0; font-size:10px;">${job.jobType === 'hourly' ? 'H' : 'F'}: ${job.budget !== 'N/A' ? job.budget : (job.hourlyRate || job.budget)}</div>
+             <div class="badge" style="margin:0; font-size:10px;">${job.jobType === 'hourly' ? 'H' : 'F'}: ${escapeHtml(job.budget !== 'N/A' ? job.budget : (job.hourlyRate || job.budget))}</div>
              <div class="badge ${job.sync_status === 'synced' ? 'applied' : 'score-low'}" style="margin:0; font-size:9px;">
-               ${job.sync_status === 'synced' ? '☁️ Synced' : `<span class="retry-sync-btn" data-id="${job.id || job.jobId}" style="cursor:pointer; text-decoration:underline;">⏳ Retry Sync</span>`}
+               ${job.sync_status === 'synced' ? 'â˜ï¸ Synced' : `<span class="retry-sync-btn" data-id="${escapeHtml(job.id || job.jobId)}" style="cursor:pointer; text-decoration:underline;">â³ Retry Sync</span>`}
              </div>
           </div>
           
-          <p class="crm-desc" style="margin: 8px 0;">${job.summary || job.description || ''}</p>
-          ${job.notes ? `<div class="notes-box" style="background:#FFFBEB; border: 1px solid #FEF3C7; padding: 8px; border-radius: 6px; font-size: 11px; margin-top: 8px; color: #92400E;"><strong>Notes:</strong> ${job.notes}</div>` : ''}
+          <p class="crm-desc" style="margin: 8px 0;">${escapeHtml(job.summary || job.description || '')}</p>
+          ${job.notes ? `<div class="notes-box" style="background:#FFFBEB; border: 1px solid #FEF3C7; padding: 8px; border-radius: 6px; font-size: 11px; margin-top: 8px; color: #92400E;"><strong>Notes:</strong> ${escapeHtml(job.notes)}</div>` : ''}
           
           ${job.skillAnalysis ? `
             <div class="skill-analysis-crm" style="margin-top: 10px; padding: 8px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;">
                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 6px;">
-                 <span style="font-size:10px; font-weight:800; color:#64748b; text-transform:uppercase;">🎯 Skill Match: ${job.skillAnalysis.matchPercentage}%</span>
+                 <span style="font-size:10px; font-weight:800; color:#64748b; text-transform:uppercase;">ðŸŽ¯ Skill Match: ${job.skillAnalysis.matchPercentage}%</span>
                  <div style="width: 40px; height: 4px; background: #e2e8f0; border-radius: 2px;">
                    <div style="width: ${job.skillAnalysis.matchPercentage}%; height: 100%; background: ${job.skillAnalysis.matchPercentage >= 70 ? '#10b981' : job.skillAnalysis.matchPercentage >= 40 ? '#f59e0b' : '#f43f5e'}; border-radius: 2px;"></div>
                  </div>
                </div>
                <div style="display:flex; flex-wrap:wrap; gap:4px;">
-                 ${(job.skillAnalysis.matchedSkills || []).slice(0, 5).map(s => `<span style="font-size:9px; background:#ecfdf5; color:#065f46; padding:1px 5px; border-radius:3px; border:1px solid #a7f3d0;">${s}</span>`).join('')}
+                 ${(job.skillAnalysis.matchedSkills || []).slice(0, 5).map(s => `<span style="font-size:9px; background:#ecfdf5; color:#065f46; padding:1px 5px; border-radius:3px; border:1px solid #a7f3d0;">${escapeHtml(s)}</span>`).join('')}
                  ${(job.skillAnalysis.missingSkills || []).length > 0 ? `<span style="font-size:9px; color:#94a3b8; font-style:italic;">+ ${(job.skillAnalysis.missingSkills || []).length} gaps</span>` : ''}
                </div>
             </div>
@@ -1154,12 +1103,12 @@ function normalizeUrl(url) {
           
           <div class="crm-actions" style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); display:flex; justify-content: space-between; align-items: center;">
             <div style="display:flex; gap: 4px; align-items: center;">
-              <select class="status-select" data-id="${job.id || job.jobId}" style="font-size: 11px; padding: 4px 8px; height: auto; width: auto; border-radius: 4px;">
+              <select class="status-select" data-id="${escapeHtml(job.id || job.jobId)}" style="font-size: 11px; padding: 4px 8px; height: auto; width: auto; border-radius: 4px;">
                 ${statuses.map(s => `<option value="${s.id}" ${job.status === s.id ? 'selected' : ''}>${s.label}</option>`).join('')}
               </select>
-              ${job.leadId ? `<a href="${CONFIG.DASHBOARD_BASE_URL}/leads/view/${job.leadId}" target="_blank" class="outline-btn" style="padding: 4px 8px; font-size: 10px; text-decoration: none; color: var(--primary); border-color: var(--primary);">🌐 Open on Zithspace</a>` : ''}
+              ${job.leadId ? `<a href="${CONFIG.DASHBOARD_BASE_URL}/leads/view/${escapeHtml(job.leadId)}" target="_blank" class="outline-btn" style="padding: 4px 8px; font-size: 10px; text-decoration: none; color: var(--primary); border-color: var(--primary);">ðŸŒ Open on Zithspace</a>` : ''}
             </div>
-            <button class="outline-btn danger-btn delete-job-btn" data-id="${job.id || job.jobId}" style="padding: 4px 10px; font-size: 11px;">Delete</button>
+            <button class="outline-btn danger-btn delete-job-btn" data-id="${escapeHtml(job.id || job.jobId)}" style="padding: 4px 10px; font-size: 11px;">Delete</button>
           </div>
         `;
         listEl.appendChild(card);
@@ -1208,7 +1157,6 @@ function normalizeUrl(url) {
 
   // Skill Matching Function
   async function doSkillMatching() {
-    console.log('Starting skill matching via API...');
     
     if (!isAuthenticated) {
       showToast('Please log in to use skill matching');
@@ -1226,7 +1174,6 @@ function normalizeUrl(url) {
     try {
       // Identify current platform
       const platform = currentJobData.jobLink.includes('freelancer.com') ? 'freelancer' : 'upwork';
-      console.log(`Matching for platform: ${platform} via API`);
 
       chrome.runtime.sendMessage({
         action: 'fetchSkills',
@@ -1244,19 +1191,16 @@ function normalizeUrl(url) {
             matchPercentage
           };
 
-          console.log(`Match Results from API (${platform}):`, currentJobData.skillAnalysis);
           
           displaySkillMatchResults(matchedSkills, missingSkills, matchPercentage, currentJobData);
           showToast(`Skills matched via Zithspace API (${platform})`);
         } else {
-          console.error('API matching failed:', response?.error);
           showToast(`Matching failed: ${response?.error || 'Unknown error'}`);
         }
         setExtractorState('success');
       });
       
     } catch (error) {
-      console.error('Skill matching error:', error);
       showToast(`Failed to match skills: ${error.message}`);
       setExtractorState('success');
     }
@@ -1283,7 +1227,7 @@ function normalizeUrl(url) {
     
     matchingSection.innerHTML = `
       <div style="background: #f8fafc; padding: 12px 16px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
-        <span style="font-size: 11px; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px;">🎯 Skill Alignment Analysis</span>
+        <span style="font-size: 11px; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px;">ðŸŽ¯ Skill Alignment Analysis</span>
         <span style="font-size: 10px; color: #94a3b8;">${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
       </div>
 
@@ -1384,7 +1328,6 @@ function normalizeUrl(url) {
   }
 
   function syncProfileSkills() {
-    console.log('Manual profile sync started...');
     const syncBtn = document.getElementById('syncProfileBtn');
     if (!syncBtn) return;
 
@@ -1395,7 +1338,7 @@ function normalizeUrl(url) {
     }
 
     const originalText = syncBtn.innerText;
-    syncBtn.innerText = '⏳ Syncing...';
+    syncBtn.innerText = 'â³ Syncing...';
     syncBtn.disabled = true;
 
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
@@ -1415,7 +1358,6 @@ function normalizeUrl(url) {
 
         if (res && res.success) {
           const platform = res.platform || 'General';
-          console.log(`Extracted ${res.count} skills for ${platform}, syncing to backend...`);
           
           // Send to background for backend sync
           chrome.runtime.sendMessage({ 
@@ -1431,11 +1373,11 @@ function normalizeUrl(url) {
               
               chrome.storage.local.set(update, () => {
                 showToast(`Success! Synced ${res.count} skills for ${platform}.`);
-                syncBtn.innerHTML = `✅ ${platform} Synced`;
+                syncBtn.innerHTML = `âœ… ${platform} Synced`;
               });
             } else {
               showToast(syncRes?.error || 'Synced locally, but cloud sync failed.');
-              syncBtn.innerHTML = '⚠️ Local Sync Only';
+              syncBtn.innerHTML = 'âš ï¸ Local Sync Only';
             }
             
             setTimeout(() => {
