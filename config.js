@@ -21,33 +21,30 @@ const ENVIRONMENTS = {
 
 // Function to detect current environment
 function detectEnvironment() {
-  let isDevelopment = false;
+  // Check if we are in a Chrome extension environment (either window or service worker)
+  if (typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.getManifest === 'function') {
+    const manifest = chrome.runtime.getManifest();
+    let isDevelopment = true;
+    if (manifest.name && (manifest.name.includes('Production') || manifest.version.includes('prod'))) {
+      isDevelopment = false;
+    }
+    return isDevelopment ? 'development' : 'production';
+  }
 
   // Browser environment
   if (typeof window !== 'undefined') {
-    isDevelopment =
+    const isLocal =
       window.location.hostname === 'localhost' ||
-      window.location.hostname === '127.0.0.1' ||
-      (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.getManifest() && (
-        chrome.runtime.getManifest().name.includes('Dev') ||
-        chrome.runtime.getManifest().version.includes('dev')
-      ));
-
-    // For Chrome extensions, default to development unless manifest indicates production
-    if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.getManifest()) {
-      const manifest = chrome.runtime.getManifest();
-      isDevelopment = true;
-      if (manifest.name.includes('Production') || manifest.version.includes('prod')) {
-        isDevelopment = false;
-      }
-    }
+      window.location.hostname === '127.0.0.1';
+    return isLocal ? 'development' : 'production';
   }
+
   // Node.js environment
-  else if (typeof process !== 'undefined' && process.env) {
-    isDevelopment = process.env.NODE_ENV !== 'production';
+  if (typeof process !== 'undefined' && process.env) {
+    return process.env.NODE_ENV !== 'production' ? 'development' : 'production';
   }
 
-  return isDevelopment ? 'development' : 'production';
+  return 'production';
 }
 
 // Get current environment configuration

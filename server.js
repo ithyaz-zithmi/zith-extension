@@ -26,6 +26,15 @@ if (!GEMINI_API_KEY) {
 app.use(cors());
 app.use(express.json());
 
+// Request logger
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+  if (req.method === 'POST') {
+    console.log('Body:', JSON.stringify(req.body, null, 2));
+  }
+  next();
+});
+
 // Initialize Gemini
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 
@@ -131,6 +140,27 @@ app.get('/api/skills', authenticateToken, (req, res) => {
     success: true,
     data: skills
   });
+});
+
+
+/**
+ * Sync User Skills (Mock)
+ * POST /api/skills/sync
+ */
+app.post('/api/skills/sync', authenticateToken, (req, res) => {
+  try {
+    const { skills, category } = req.body;
+    console.log(`Syncing ${skills ? skills.length : 0} skills for platform ${category}`);
+
+    // In a mock server, we just return a success response
+    res.status(200).json({
+      success: true,
+      message: 'Skills synced successfully'
+    });
+  } catch (error) {
+    console.error('Error syncing skills:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
 });
 
 
