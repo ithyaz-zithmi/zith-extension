@@ -33,12 +33,12 @@
             d="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z" />
         </svg>
       </a>
-      <a href="#" id="optionsBtn" class="nav-btn" title="Settings">
+      <!-- <a href="#" id="optionsBtn" class="nav-btn" title="Settings">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
           <path
             d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z" />
         </svg>
-      </a>
+      </a> -->
       <a href="#" id="logoutBtn" class="nav-btn" title="Logout" style="display: none;">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
           <path
@@ -93,10 +93,19 @@
         style="margin: 0 auto 20px; width: 64px; height: 64px; background: #EEF2FF; color: var(--primary); border-radius: 20px; display: flex; align-items: center; justify-content: center; font-size: 28px;">
         🔍
       </div>
-      <p class="text-muted" style="margin-bottom: 24px;">Navigate to an Upwork job page to begin.</p>
+      <p id="idleInstructions" class="text-muted" style="margin-bottom: 24px;">Navigate to an Upwork job page to begin.</p>
+      
+      <div id="wrongPageMsg" class="hidden" style="text-align: center; margin-bottom: 24px;">
+        <p style="color: var(--danger); font-weight: 600; margin-bottom: 8px;">Wrong Page</p>
+        <p class="text-muted" style="font-size: 13px; line-height: 1.5;">Please navigate to an active Upwork or Freelancer job page to use the extractor.</p>
+      </div>
+
       <div style="display: flex; flex-direction: column; gap: 12px; align-items: center;">
         <button id="extractBtn" class="primary-btn" style="width: 200px;">Extract Job</button>
-        <button id="syncProfileBtn" class="secondary-btn" style="width: 200px; font-size: 13px;">🔄 Sync My Profile Skills</button>
+        <div style="text-align: center; margin-top: 8px;">
+          <p class="text-muted" style="font-size: 11px; margin-bottom: 8px; max-width: 200px;">Go to your profile page and sync your skills to improve matching.</p>
+          <button id="syncProfileBtn" class="secondary-btn" style="width: 200px; font-size: 13px;">🔄 Sync My Profile Skills</button>
+        </div>
       </div>
     </div>
 
@@ -220,29 +229,12 @@
         </div>
 
         
-        <div class="proposal-controls-card">
-          <div class="section-header">💎 <span>Apply Professional Style</span></div>
-          <div class="select-wrapper">
-            <select id="templateSelect">
-              <option value="detailed">Detailed Proposal</option>
-              <option value="short">Short Proposal</option>
-              <option value="technical">Technical Proposal</option>
-            </select>
-          </div>
-          <button id="generateBtn" class="primary-btn mt-2" style="width:100%">🚀 Generate Smart Proposal</button>
-        </div>
+
       </div>
 
-      <div id="proposalBox" class="hidden mt-3">
-        <div style="position: relative;">
-          <textarea id="proposalTextarea" rows="6" placeholder="Your proposal here..." style="padding-right: 50px;"></textarea>
-          <button id="copyProposalBtn" class="secondary-btn" style="position: absolute; top: 8px; right: 8px; padding: 4px 8px; font-size: 11px;"> Copy</button>
-        </div>
-      </div>
-      
       <!-- Fixed Save Button -->
       <div id="fixedSaveBtn" class="hidden">
-        <button id="saveBtn" class="success-btn" style="width: 100%;"> Save Job & Proposal</button>
+        <button id="saveBtn" class="success-btn" style="width: 100%;"> Save Job</button>
       </div>
     </div>
   </div>

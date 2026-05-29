@@ -346,13 +346,34 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           })
         });
 
-        const result = await response.json();
+        const responseText = await response.text();
 
-        if (response.ok) {
-          sendResponse({ success: true, message: result.message });
-        } else {
-          sendResponse({ success: false, error: result.message || 'Sync failed' });
+        if (!response.ok) {
+          let errorMessage = `Sync failed with status ${response.status}`;
+          if (responseText) {
+            if (responseText.trim().startsWith('<')) {
+              errorMessage = `Server error (${response.status}): Invalid response format.`;
+            } else {
+              try {
+                const errorData = JSON.parse(responseText);
+                errorMessage = errorData.message || errorData.error || errorMessage;
+              } catch {
+                errorMessage = responseText.substring(0, 150);
+              }
+            }
+          }
+          sendResponse({ success: false, error: errorMessage });
+          return;
         }
+
+        let result = {};
+        try {
+          result = JSON.parse(responseText);
+        } catch (e) {
+          // Response was not JSON
+        }
+
+        sendResponse({ success: true, message: result.message || 'Skills synced successfully' });
       } catch (error) {
         sendResponse({ success: false, error: error.message });
       }
@@ -466,13 +487,20 @@ async function syncJobToBackend(jobData, proposal, score, templateUsed) {
     const responseText = await response.text();
 
     if (!response.ok) {
-      let errorData;
-      try {
-        errorData = JSON.parse(responseText);
-      } catch {
-        errorData = { message: responseText };
+      let errorMessage = `Backend sync failed with status ${response.status}`;
+      if (responseText) {
+        if (responseText.trim().startsWith('<')) {
+          errorMessage = `Server error (${response.status}): Invalid response format.`;
+        } else {
+          try {
+            const errorData = JSON.parse(responseText);
+            errorMessage = errorData.message || errorData.error || errorMessage;
+          } catch {
+            errorMessage = responseText.substring(0, 150);
+          }
+        }
       }
-      throw new Error(errorData.message || `Backend sync failed with status ${response.status}`);
+      throw new Error(errorMessage);
     }
 
     let responseData = {};
