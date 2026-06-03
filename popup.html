@@ -10,8 +10,8 @@
 <body>
   <div class="header">
     <div style="display: flex; align-items: center; gap: 2px;">
-      <img src="logo.jpeg" alt="ZithPort Logo"
-        style="width: 52px; height: 52px; border-radius: 6px; object-fit: cover;">
+      <img src="Zukvologo.png" alt="ZithPort Logo"
+        style="width: 32px; height: 32px; border-radius: 6px; object-fit: cover;">
       <h2>ZithPort</h2>
     </div>
     <div class="header-nav hidden">
@@ -27,7 +27,7 @@
             d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z" />
         </svg>
       </a>
-      <a href="#" id="dashboardBtn" class="nav-btn" title="Open Zithspace Dashboard">
+      <a href="#" id="dashboardBtn" class="nav-btn" title="Open Zukvo Dashboard">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
           <path
             d="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z" />
@@ -87,24 +87,29 @@
     <!-- IDLE State -->
     <div id="idleState" class="state-container">
       <div style="position: absolute; top: 20px; right: 20px;">
-        <button id="matchSkillsBtn" class="secondary-btn" style="padding: 8px 16px; font-size: 12px;"> Match Skills</button>
+        <button id="matchSkillsBtn" class="secondary-btn" style="padding: 8px 16px; font-size: 12px;"> Match
+          Skills</button>
       </div>
       <div
         style="margin: 0 auto 20px; width: 64px; height: 64px; background: #EEF2FF; color: var(--primary); border-radius: 20px; display: flex; align-items: center; justify-content: center; font-size: 28px;">
         🔍
       </div>
-      <p id="idleInstructions" class="text-muted" style="margin-bottom: 24px;">Navigate to an Upwork job page to begin.</p>
-      
+      <p id="idleInstructions" class="text-muted" style="margin-bottom: 24px;">Navigate to an Upwork job page to begin.
+      </p>
+
       <div id="wrongPageMsg" class="hidden" style="text-align: center; margin-bottom: 24px;">
         <p style="color: var(--danger); font-weight: 600; margin-bottom: 8px;">Wrong Page</p>
-        <p class="text-muted" style="font-size: 13px; line-height: 1.5;">Please navigate to an active Upwork or Freelancer job page to use the extractor.</p>
+        <p class="text-muted" style="font-size: 13px; line-height: 1.5;">Please navigate to an active Upwork or
+          Freelancer job page to use the extractor.</p>
       </div>
 
       <div style="display: flex; flex-direction: column; gap: 12px; align-items: center;">
         <button id="extractBtn" class="primary-btn" style="width: 200px;">Extract Job</button>
         <div style="text-align: center; margin-top: 8px;">
-          <p class="text-muted" style="font-size: 11px; margin-bottom: 8px; max-width: 200px;">Go to your profile page and sync your skills to improve matching.</p>
-          <button id="syncProfileBtn" class="secondary-btn" style="width: 200px; font-size: 13px;">🔄 Sync My Profile Skills</button>
+          <p class="text-muted" style="font-size: 11px; margin-bottom: 8px; max-width: 200px;">Go to your profile page
+            and sync your skills to improve matching.</p>
+          <button id="syncProfileBtn" class="secondary-btn" style="width: 200px; font-size: 13px;">🔄 Sync My Profile
+            Skills</button>
         </div>
       </div>
     </div>
@@ -131,7 +136,7 @@
         style="background: var(--success-bg); color: var(--success); width: 64px; height: 64px; border-radius: 20px; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; font-size: 28px;">
         ✅</div>
       <h3 id="successTitle" style="color: var(--text-main); margin-bottom: 8px;">Lead Saved Successfully!</h3>
-      <p id="successMsg" class="text-muted" style="margin-bottom: 32px;">The job has been synced to Zithspace.</p>
+      <p id="successMsg" class="text-muted" style="margin-bottom: 32px;">The job has been synced to Zukvo.</p>
       <div style="display: flex; flex-direction: column; gap: 12px; max-width: 240px; margin: 0 auto; width: 100%;">
         <button id="viewInDashboardBtn" class="primary-btn" style="width: 100%;">🌐 Open Dashboard</button>
         <button id="extractNewBtn" class="secondary-btn" style="width: 100%;">✨ Extract Another</button>
@@ -145,16 +150,18 @@
         <div style="position: absolute; top: 16px; right: 16px;">
           <button id="matchSkillsInJobBtn" class="skills-match-btn"> Match Skills</button>
         </div>
-        
+
         <!-- Duplicate Warning -->
         <div id="duplicateWarning" class="hidden"
           style="background: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af; padding: 12px; border-radius: 12px; font-size: 13px; display: flex; align-items: center; justify-content: center; gap: 10px; font-weight: 700; margin-bottom: 20px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
-          <div style="background: white; width: 24px; height: 24px; border-radius: 6px; display: flex; align-items: center; justify-content: center;">📌</div>
-          Already in your Zithspace Pipeline
+          <div
+            style="background: white; width: 24px; height: 24px; border-radius: 6px; display: flex; align-items: center; justify-content: center;">
+            📌</div>
+          Already in your Zukvo Pipeline
         </div>
 
         <div id="extractionStatus" class="hidden"></div>
-        
+
         <div class="mb-2">
           <label class="lead-label">Extracted Lead</label>
           <h3 id="jobTitleDisplay">Job Title</h3>
@@ -201,7 +208,7 @@
           <div class="section-header">🛠 <span>Required Skills</span></div>
           <div id="jobSkills" class="skills-wrap"></div>
         </div>
-        
+
         <div id="attachmentsSection" class="mt-3 hidden">
           <div class="section-header">📎 <span>Attachments</span></div>
           <div id="jobAttachments" class="skills-wrap mt-2"></div>
@@ -228,7 +235,7 @@
           <a id="uiJobLink" href="#" target="_blank">Waiting for link...</a>
         </div>
 
-        
+
 
       </div>
 

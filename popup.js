@@ -384,7 +384,7 @@ async function handleLogin(email, password) {
       proceedWithAuth(data.accessToken, data.user, true);
       showToast('Login successful!');
     } else {
-      showLoginError('Sign up with Zithspace to use the extension for free');
+      showLoginError('Sign up with Zukvo to use the extension for free');
     }
   } catch (error) {
     showLoginError('Login failed. Please try again.');
@@ -638,7 +638,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (message === 'Job saved & synced!') {
         title.innerText = "Lead Saved Successfully!";
-        msg.innerText = "The job has been synced to Zithspace.";
+        msg.innerText = "The job has been synced to Zukvo.";
       } else {
         title.innerText = "Saved Locally";
         msg.innerText = "Save complete, but sync is pending. You can retry from the Saved list.";
@@ -745,7 +745,7 @@ document.addEventListener('DOMContentLoaded', () => {
           fixedSaveContainer.classList.remove('hidden'); // Show it
         }
         if (saveBtn) {
-          saveBtn.innerText = "Job Already in Zithspace";
+          saveBtn.innerText = "Job Already in Zukvo";
           saveBtn.disabled = true;
           saveBtn.classList.replace('success-btn', 'secondary-btn');
           saveBtn.style.opacity = '0.6';
@@ -1151,7 +1151,7 @@ function normalizeUrl(url) {
               <select class="status-select" data-id="${job.id || job.jobId}" style="font-size: 11px; padding: 4px 8px; height: auto; width: auto; border-radius: 4px;">
                 ${statuses.map(s => `<option value="${s.id}" ${job.status === s.id ? 'selected' : ''}>${s.label}</option>`).join('')}
               </select>
-              ${job.leadId ? `<a href="${CONFIG.DASHBOARD_BASE_URL}/leads/view/${job.leadId}" target="_blank" class="outline-btn" style="padding: 4px 8px; font-size: 10px; text-decoration: none; color: var(--primary); border-color: var(--primary);">🌐 Open on Zithspace</a>` : ''}
+              ${job.leadId ? `<a href="${CONFIG.DASHBOARD_BASE_URL}/leads/view/${job.leadId}" target="_blank" class="outline-btn" style="padding: 4px 8px; font-size: 10px; text-decoration: none; color: var(--primary); border-color: var(--primary);">🌐 Open on Zukvo</a>` : ''}
             </div>
             <button class="outline-btn danger-btn delete-job-btn" data-id="${job.id || job.jobId}" style="padding: 4px 10px; font-size: 11px;">Delete</button>
           </div>
@@ -1215,7 +1215,7 @@ function normalizeUrl(url) {
       return;
     }
 
-    setExtractorState('loading', 'Consulting Zithspace skills...');
+    setExtractorState('loading', 'Consulting Zukvo skills...');
     
     try {
       // Identify current platform
@@ -1241,7 +1241,7 @@ function normalizeUrl(url) {
           console.log(`Match Results from API (${platform}):`, currentJobData.skillAnalysis);
           
           displaySkillMatchResults(matchedSkills, missingSkills, matchPercentage, currentJobData);
-          showToast(`Skills matched via Zithspace API (${platform})`);
+          showToast(`Skills matched via Zukvo API (${platform})`);
         } else {
           console.error('API matching failed:', response?.error);
           showToast(`Matching failed: ${response?.error || 'Unknown error'}`);
@@ -1383,7 +1383,7 @@ function normalizeUrl(url) {
     if (!syncBtn) return;
 
     if (!isAuthenticated) {
-      showToast('Please log in to sync your profile with Zithspace');
+      showToast('Please log in to sync your profile with Zukvo');
       showLoginInterface();
       return;
     }
