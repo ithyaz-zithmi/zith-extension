@@ -1,4 +1,4 @@
-﻿/**
+/**
  * content.js
  * Extracts job details from Upwork job pages.
  */
@@ -39,6 +39,9 @@ const getPlatform = () => {
     const host = window.location.hostname;
     if (host.includes('upwork.com')) return 'upwork';
     if (host.includes('freelancer.com')) return 'freelancer';
+    if (host.includes('guru.com')) return 'guru';
+    // if (host.includes('toptal.com')) return 'toptal';
+    // if (host.includes('fiverr.com')) return 'fiverr';
     return 'unknown';
 };
 
@@ -1033,9 +1036,938 @@ const performFreelancerExtraction = () => {
     return data;
 };
 
+// ─────────────────────────────────────────────────────────────
+// Guru.com Extraction
+// ─────────────────────────────────────────────────────────────
+const performGuruExtraction = () => {
+    // Scope to main job content; fall back to document
+    const searchContext =
+        document.querySelector(
+            '.jobDetails, .job__details, [class*="jobDescription"], .jobPostingDetails, ' +
+            '.guruJobDesc, #jobDetails, main, #main'
+        ) || document;
+
+    // Detect the employer/Posted By container to avoid matching headers/navigation
+    const getEmployerContainer = () => {
+        // Option 1: Look for container with header "Posted By"
+        const headings = document.querySelectorAll('h2, h3, h4, h5, h6, div, p, span, strong, td');
+        for (const h of headings) {
+            const txt = (h.innerText || h.textContent || '').trim().toLowerCase();
+            if (txt === 'posted by') {
+                const container = h.closest('.card, .module, section, div, [class*="sidebar"], [class*="container"]');
+                if (container) return container;
+            }
+        }
+        
+        // Option 2: Look for common employer class names (excluding main navigation/header)
+        const classContainers = document.querySelectorAll(
+            '.jobDetails__employer, .jobPost__employer, .guruEmployer, .memberInfo, ' +
+            '.postedBy, [class*="postedBy"], [class*="employer"], [class*="Employer"]'
+        );
+        for (const container of classContainers) {
+            if (!container.closest('header, nav, .header, .nav, #header, #nav, .navigation')) {
+                return container;
+            }
+        }
+        
+        return document;
+    };
+
+    const employerContext = getEmployerContainer();
+
+    // Helpers
+    const getText = (selectors, fallback = 'N/A') => {
+        for (const sel of selectors) {
+            try {
+                for (const el of searchContext.querySelectorAll(sel)) {
+                    const t = (el.innerText || el.textContent || '').trim();
+                    if (t && t.length > 1) return t;
+                }
+                for (const el of document.querySelectorAll(sel)) {
+                    const t = (el.innerText || el.textContent || '').trim();
+                    if (t && t.length > 1) return t;
+                }
+            } catch (e) {}
+        }
+        return fallback;
+    };
+
+    // Scoped client helper
+    const getClientText = (selectors, fallback = 'N/A') => {
+        for (const sel of selectors) {
+            try {
+                for (const el of employerContext.querySelectorAll(sel)) {
+                    const t = (el.innerText || el.textContent || '').trim();
+                    if (t && t.length > 1) return t;
+                }
+            } catch (e) {}
+        }
+        return getText(selectors, fallback);
+    };
+
+    const getArray = (selectors) => {
+        const items = [];
+        for (const sel of selectors) {
+            try {
+                document.querySelectorAll(sel).forEach(el => {
+                    const t = (el.innerText || el.textContent || '').trim();
+                    if (t && !items.includes(t) && t.length > 1 && t.length < 60 && !t.includes('\n'))
+                        items.push(t);
+                });
+                if (items.length > 0) break;
+            } catch (e) {}
+        }
+        return items;
+    };
+
+    // Walk DOM tree looking for a label -> sibling value pattern
+    const getByLabel = (labelName, fallback = 'N/A') => {
+        const lower = labelName.toLowerCase();
+        
+        // Scope search to employerContext first for client-related labels
+        const searchNodes = Array.from(employerContext.querySelectorAll(
+            'span, div, p, label, dt, li, td, strong, h4, h5'
+        )).concat(Array.from(document.querySelectorAll(
+            'span, div, p, label, dt, li, td, strong, h4, h5'
+        )));
+        
+        const uniqueNodes = Array.from(new Set(searchNodes));
+
+        for (const node of uniqueNodes) {
+            const nt = (node.innerText || node.textContent || '').trim().toLowerCase();
+            if (nt === lower || (nt.startsWith(lower) && nt.length < lower.length + 4)) {
+                let val = node.nextElementSibling;
+                if (val && (val.innerText || val.textContent || '').trim()) return (val.innerText || val.textContent).trim();
+                if (node.parentElement) {
+                    val = node.parentElement.nextElementSibling;
+                    if (val && (val.innerText || val.textContent || '').trim()) return (val.innerText || val.textContent).trim();
+                }
+                if (node.parentElement) {
+                    const parentTxt = (node.parentElement.innerText || node.parentElement.textContent || '').trim();
+                    const stripped = parentTxt.replace((node.innerText || node.textContent).trim(), '').trim();
+                    if (stripped.length > 1) return stripped;
+                }
+            }
+        }
+        return fallback;
+    };
+
+    // Helper: scan page for sidebar stat label+value pairs
+    // Guru shows: "Jobs Posted   16" as adjacent cells/divs
+    const getSidebarStat = (labelText) => {
+        const lower = labelText.toLowerCase();
+        const candidates = Array.from(employerContext.querySelectorAll(
+            'td, th, dt, dd, li, span, div, p, strong'
+        )).concat(Array.from(document.querySelectorAll(
+            'td, th, dt, dd, li, span, div, p, strong'
+        )));
+        
+        const uniqueCandidates = Array.from(new Set(candidates));
+
+        for (const el of uniqueCandidates) {
+            const t = (el.innerText || el.textContent || '').trim();
+            if (t.toLowerCase() === lower) {
+                // Try adjacent sibling in same row/parent
+                const sibling = el.nextElementSibling;
+                if (sibling) {
+                    const sv = (sibling.innerText || sibling.textContent || '').trim();
+                    if (sv) return sv;
+                }
+                // Parent's next sibling (for table row / div row patterns)
+                if (el.parentElement) {
+                    const pSib = el.parentElement.nextElementSibling;
+                    if (pSib) {
+                        const psv = (pSib.innerText || pSib.textContent || '').trim();
+                        if (psv) return psv;
+                    }
+                    // Value might be rest of parent text after the label
+                    const parentText = (el.parentElement.innerText || el.textContent || '').trim();
+                    const stripped = parentText.replace(t, '').trim().replace(/^[:\-|]+/, '').trim();
+                    if (stripped && stripped.length > 0 && stripped !== t) return stripped;
+                }
+            }
+        }
+    };
+
+    // Title
+    const title = getText([
+        '.jobHeading__title',
+        '.jobTitle h1', '.jobTitle h2',
+        '[class*="jobTitle"] h1', '[class*="jobTitle"] h2',
+        '.guruJobTitle', '#jobTitle',
+        'h1.title', 'h2.title',
+        'h1', 'h2'
+    ], 'Title not found');
+
+    // Description
+    const summary = (() => {
+        const descSelectors = [
+            '.jobDesc', '.job__description', '[class*="jobDescription"]',
+            '.jobDetails__description', '#jobDescription',
+            '.guruJobDesc', '.jobPost__description',
+            '.jobDetails .description', '.jobPost .description'
+        ];
+        for (const sel of descSelectors) {
+            const el = document.querySelector(sel);
+            if (el) {
+                const clone = el.cloneNode(true);
+                clone.querySelectorAll('br').forEach(br => br.replaceWith('\n'));
+                clone.querySelectorAll('p, div, li').forEach(b => b.appendChild(document.createTextNode('\n')));
+                const txt = clone.textContent.trim().replace(/\n{3,}/g, '\n\n');
+                if (txt.length > 30) return txt;
+            }
+        }
+        return 'Summary not found';
+    })();
+
+    // Skills
+    const skills = getArray([
+        '.skillsList__skill',
+        '.skillsList a', '.skills__list a', '[class*="skillTag"] a',
+        '[class*="skill"] a', '[class*="skill"] span',
+        '.jobSkills a', '.jobSkills span',
+        'a[href*="/jobs/q"]',
+        '.tag a', '.tags a',
+        '[class*="tag"]'
+    ]);
+
+    // Budget / Rate
+    // Guru renders: "Fixed Price  |  Under $250" or "Hourly  |  $45 - $60/hr"
+    let budget = 'N/A';
+    let hourlyRate = 'N/A';
+    let jobType = 'unknown';
+
+    // Step 1: Try dedicated budget elements
+    const budgetEl = document.querySelector(
+        '.jobBudget, .job__budget, [class*="jobBudget"], .budgetType, ' +
+        '.guruBudget, .jobPost__budget, [class*="Budget"] .amount, ' +
+        '.services__budget, #jobBudget, .jobHeading__budget'
+    );
+    let rawHeaderText = budgetEl ? (budgetEl.innerText || budgetEl.textContent || '').replace(/\s+/g, ' ').trim() : '';
+
+    // Step 2: Scan page for the "Fixed Price | Under $250" pattern
+    if (!rawHeaderText) {
+        const allEls = document.querySelectorAll('p, div, span, strong, li, h3, h4');
+        for (const el of allEls) {
+            const t = (el.innerText || el.textContent || '').replace(/\s+/g, ' ').trim();
+            // Short single-line text with pricing keywords
+            if (t.length < 150) {
+                const lt = t.toLowerCase();
+                if ((lt.includes('fixed') || lt.includes('hourly')) &&
+                    (t.includes('$') || lt.includes('under') || lt.includes('over'))) {
+                    rawHeaderText = t;
+                    break;
+                }
+            }
+        }
+    }
+
+    // Step 3: Also check label-based fallbacks
+    if (!rawHeaderText) rawHeaderText = getByLabel('Budget');
+    if (!rawHeaderText || rawHeaderText === 'N/A') rawHeaderText = getByLabel('Rate');
+    if (!rawHeaderText || rawHeaderText === 'N/A') rawHeaderText = getByLabel('Bid Range');
+    if (!rawHeaderText || rawHeaderText === 'N/A') rawHeaderText = getByLabel('Est. Budget');
+
+    // Step 4: Parse the raw text
+    if (rawHeaderText && rawHeaderText !== 'N/A') {
+        const lt = rawHeaderText.toLowerCase();
+
+        if (lt.includes('hourly') || lt.includes('/hr') || lt.includes('per hour')) {
+            jobType = 'hourly';
+            const rateMatch = rawHeaderText.match(/\$\s*[\d,]+(?:\.\d{1,2})?\s*[-\u2013]\s*\$?\s*[\d,]+(?:\.\d{1,2})/);
+            if (rateMatch) {
+                hourlyRate = rateMatch[0].trim();
+            } else {
+                const singleMatch = rawHeaderText.match(/\$\s*[\d,]+(?:\.\d{1,2})?/);
+                if (singleMatch) hourlyRate = singleMatch[0].trim();
+            }
+        } else if (lt.includes('fixed') || lt.includes('price')) {
+            jobType = 'fixed';
+            const rangeMatch = rawHeaderText.match(/\$\s*[\d,]+(?:\.\d{1,2})?\s*[-\u2013]\s*\$?\s*[\d,]+(?:\.\d{1,2})/);
+            if (rangeMatch) {
+                budget = rangeMatch[0].trim();
+            } else {
+                const budgetMatch = rawHeaderText.match(/(?:Under|Over|Up to)?\s*\$\s*[\d,]+(?:\.\d{1,2})?(?:k)?/i);
+                if (budgetMatch) budget = budgetMatch[0].trim();
+            }
+        }
+    }
+
+    // Step 5: Scoped regex fallback in job header section only (not full body)
+    if (budget === 'N/A' && hourlyRate === 'N/A') {
+        const headerSection = document.querySelector(
+            '.jobHeading, .jobPost__header, .jobDetails__header, .jobBudgetSection, ' +
+            '.jobPost .card:first-child, h1, h2'
+        );
+        const textToSearch = headerSection ? (headerSection.innerText || headerSection.textContent || '') : '';
+        const rangeMatch = textToSearch.match(
+            /([\$\u20B9\u20AC\u00A3]\s*[\d,]+(?:\.\d{1,2})?\s*[-\u2013]\s*[\$\u20B9\u20AC\u00A3]?\s*[\d,]+(?:\.\d{1,2})?(?:\s*(?:INR|USD|EUR|GBP|AUD|CAD))?)/i
+        );
+        const singleMatch = textToSearch.match(
+            /([\$\u20B9\u20AC\u00A3]\s*[\d,]+(?:\.\d{1,2})?(?:\s*\/\s*hr|\/\s*hour|per hour)?)/i
+        );
+        if (rangeMatch) rawHeaderText = rangeMatch[1];
+        else if (singleMatch) rawHeaderText = singleMatch[1];
+
+        if (rawHeaderText && rawHeaderText !== 'N/A') {
+            const lt = rawHeaderText.toLowerCase();
+            if (lt.includes('/hr') || lt.includes('/hour') || lt.includes('per hour') || lt.includes('hourly')) {
+                jobType = 'hourly';
+                hourlyRate = rawHeaderText;
+            } else {
+                jobType = 'fixed';
+                budget = rawHeaderText;
+            }
+        }
+    }
+
+    // Client info
+    const rawText = document.body.innerText || document.body.textContent || '';
+
+    const clientName = getClientText([
+        '.avatarinfo .identityName strong',
+        '.avatarinfo .identityName',
+        '.jobDetails__employer .identityName',
+        '.employerName', '.employer__name', '[class*="employerName"]',
+        '.jobPost__employer h2', '.jobPost__employer h3',
+        '.guruEmployer .name', '#employerName',
+        '.memberInfo .name', '.memberName',
+        '.postedBy a', '[class*="postedBy"] a',
+        '[class*="employer"] a', '[class*="Employer"] a',
+    ]);
+
+    let clientLocation = getClientText([
+        '.avatarinfo .subtext strong',
+        '.avatarinfo .subtext',
+        '.employerLocation', '.employer__location', '[class*="employerLocation"]',
+        '.guruLocation', '.memberLocation',
+        '[class*="location"] span', '.jobPost__location',
+        'span[itemprop="addressLocality"]', 'span[itemprop="addressCountry"]'
+    ]);
+    if (clientLocation === 'N/A') clientLocation = getByLabel('Location');
+
+    // Clean up Guru location if it contains metadata separator '|'
+    if (clientLocation && clientLocation !== 'N/A') {
+        const parts = clientLocation.split('|').map(p => p.trim());
+        let cleanLocation = 'N/A';
+        for (const part of parts) {
+            if (!part) continue;
+            const lowerPart = part.toLowerCase();
+            // Exclude feedback, member since, or placeholders like empty percentages
+            if (lowerPart.includes('%') || 
+                lowerPart.includes('feedback') || 
+                lowerPart.includes('member since') || 
+                lowerPart.includes('joined') ||
+                lowerPart === 'no feedback' ||
+                lowerPart === 'n/a') {
+                continue;
+            }
+            // First valid part is the location
+            cleanLocation = part;
+            break;
+        }
+        clientLocation = cleanLocation;
+    }
+
+    // Feedback / Rating
+    let clientRating = getSidebarStat('Feedback');
+    if (clientRating === 'N/A') {
+        clientRating = getClientText([
+            '.employerRating', '.employer__rating', '[class*="employerRating"]',
+            '.guruFeedback', '.feedbackScore', '.memberFeedback',
+            '[class*="feedback"] .percent', '[class*="rating"] .value'
+        ]);
+    }
+    if (clientRating && clientRating !== 'N/A') {
+        const pctMatch = clientRating.match(/([\d.]+%)/);
+        if (pctMatch) {
+            clientRating = pctMatch[1];
+        } else if (clientRating.toLowerCase().includes('no feedback')) {
+            clientRating = 'No Feedback';
+        }
+    }
+    if (clientRating === 'N/A') {
+        const fbMatch = rawText.match(/Feedback\s+([\d.]+%)/i) ||
+                        rawText.match(/([\d.]+)\s*\(\s*[\d,]+\s*reviews?\s*\)/i) ||
+                        rawText.match(/([\d]+%?)\s*feedback/i);
+        if (fbMatch) clientRating = fbMatch[1];
+    }
+
+    // Total Spend
+    let clientSpend = getSidebarStat('Total Spend');
+    if (clientSpend === 'N/A') {
+        clientSpend = getClientText([
+            '.totalPaid', '.employer__totalPaid', '[class*="totalPaid"]',
+            '[class*="totalSpend"]', '.guruTotalSpend'
+        ]);
+    }
+    if (clientSpend === 'N/A') clientSpend = getByLabel('Total Paid');
+    if (clientSpend === 'N/A') clientSpend = getByLabel('Total Spend');
+
+    // Jobs Posted
+    let clientJobsPosted = getSidebarStat('Jobs Posted');
+    if (clientJobsPosted === 'N/A') {
+        clientJobsPosted = getClientText(['.jobsPosted', '.employer__jobsPosted', '[class*="jobsPosted"]']);
+    }
+    if (clientJobsPosted === 'N/A') clientJobsPosted = getByLabel('Jobs Posted');
+
+    // Jobs Paid
+    let clientJobsPaid = getSidebarStat('Jobs Paid');
+    if (clientJobsPaid === 'N/A') clientJobsPaid = getByLabel('Jobs Paid');
+
+    // Paid Invoices
+    let clientPaidInvoices = getSidebarStat('Paid Invoices');
+    if (clientPaidInvoices === 'N/A') clientPaidInvoices = getByLabel('Paid Invoices');
+
+    // Outstanding Invoices
+    let clientOutstandingInvoices = getSidebarStat('Outstanding Invoices');
+    if (clientOutstandingInvoices === 'N/A') clientOutstandingInvoices = getByLabel('Outstanding Invoices');
+
+    // Verifications
+    const isPaymentVerified = /payment\s*verified/i.test(rawText);
+    const isPhoneVerified = /phone\s*verified/i.test(rawText);
+    const isIdentityVerified = /identity\s*verified/i.test(rawText);
+
+    // Posted Date
+    let postedOn = getText([
+        '.jobHeading__meta',
+        '.jobPostedDate', '.job__postedDate', '[class*="postedDate"]',
+        '.guruPostedDate', '.postDate', '[class*="postDate"]',
+        'time', '[datetime]'
+    ]);
+
+    if (postedOn === 'N/A') {
+        const timeEl = document.querySelector('time[datetime], [datetime]');
+        if (timeEl) postedOn = timeEl.getAttribute('datetime') || timeEl.innerText.trim() || timeEl.textContent.trim();
+    }
+
+    if (postedOn === 'N/A') {
+        const m = rawText.match(/(\d+\s+(?:minute|hour|day|week|month)s?\s+ago)/i);
+        if (m) postedOn = m[1];
+    }
+
+    // Normalise to ISO
+    if (postedOn && postedOn !== 'N/A') {
+        postedOn = postedOn.replace(/^posted\s+/i, '').trim();
+        const now = new Date();
+        const agoMatch = postedOn.match(/(\d+)\s+(minute|hour|day|week|month)s?\s+ago/i);
+        if (agoMatch) {
+            const val = parseInt(agoMatch[1]);
+            const unit = agoMatch[2].toLowerCase();
+            const d = new Date(now);
+            if (unit === 'minute') d.setMinutes(d.getMinutes() - val);
+            else if (unit === 'hour') d.setHours(d.getHours() - val);
+            else if (unit === 'day') d.setDate(d.getDate() - val);
+            else if (unit === 'week') d.setDate(d.getDate() - val * 7);
+            else if (unit === 'month') d.setMonth(d.getMonth() - val);
+            postedOn = d.toISOString();
+        } else {
+            const parsed = new Date(postedOn);
+            if (!isNaN(parsed.getTime())) postedOn = parsed.toISOString();
+        }
+    }
+
+    // Duration / Experience
+    const duration = getByLabel('Duration') !== 'N/A' ? getByLabel('Duration') : getByLabel('Project Length');
+    const experienceLevel = getByLabel('Experience Level') !== 'N/A' ? getByLabel('Experience Level') : getByLabel('Skill Level');
+
+    // Build Result
+    const data = {
+        jobId: window.location.href,
+        jobLink: window.location.href,
+        title,
+        summary,
+        skills,
+        attachments: [],
+        budget,
+        hourlyRate,
+        jobType,
+        projectType: jobType,
+        duration,
+        experienceLevel,
+        clientName,
+        clientLocation,
+        clientRating,
+        clientSpend,
+        clientJobsPosted,
+        clientJobsPaid,
+        clientPaidInvoices,
+        clientOutstandingInvoices,
+        clientPaymentVerified: isPaymentVerified,
+        clientPhoneVerified: isPhoneVerified,
+        clientIdentityVerified: isIdentityVerified,
+        postedOn
+    };
+
+    data.validation = validateJobData(data);
+    return data;
+};
+
+// ─────────────────────────────────────────────────────────────
+// Toptal.com Extraction
+// ─────────────────────────────────────────────────────────────
+/*
+const performToptalExtraction = () => {
+    // Toptal job pages are React SPAs; scope to the main content block
+    const searchContext =
+        document.querySelector(
+            '[class*="JobDetails"], [class*="jobDetails"], [class*="job-details"], ' +
+            '[class*="JobDescription"], main, #main'
+        ) || document;
+
+    // ── Helpers ──────────────────────────────────────────────
+    const getText = (selectors, fallback = 'N/A') => {
+        for (const sel of selectors) {
+            try {
+                for (const el of searchContext.querySelectorAll(sel)) {
+                    const t = (el.innerText || '').trim();
+                    if (t && t.length > 1) return t;
+                }
+                for (const el of document.querySelectorAll(sel)) {
+                    const t = (el.innerText || '').trim();
+                    if (t && t.length > 1) return t;
+                }
+            } catch (e) {}
+        }
+        return fallback;
+    };
+
+    const getArray = (selectors) => {
+        const items = [];
+        for (const sel of selectors) {
+            try {
+                document.querySelectorAll(sel).forEach(el => {
+                    const t = (el.innerText || '').trim();
+                    if (t && !items.includes(t) && t.length > 1 && t.length < 60 && !t.includes('\n'))
+                        items.push(t);
+                });
+                if (items.length > 0) break;
+            } catch (e) {}
+        }
+        return items;
+    };
+
+    const getByLabel = (labelName, fallback = 'N/A') => {
+        const lower = labelName.toLowerCase();
+        for (const node of document.querySelectorAll('span, div, p, label, dt, li, td, strong, h4, h5')) {
+            const nt = (node.innerText || '').trim().toLowerCase();
+            if (nt === lower || (nt.startsWith(lower) && nt.length < lower.length + 4)) {
+                let val = node.nextElementSibling;
+                if (val && (val.innerText || '').trim()) return val.innerText.trim();
+                if (node.parentElement) {
+                    val = node.parentElement.nextElementSibling;
+                    if (val && (val.innerText || '').trim()) return val.innerText.trim();
+                }
+            }
+        }
+        return fallback;
+    };
+
+    // ── Title ────────────────────────────────────────────────
+    const title = getText([
+        '[class*="JobTitle"] h1', '[class*="JobTitle"] h2',
+        '[class*="job-title"]', '[class*="jobTitle"]',
+        '[data-testid="job-title"]', '.JobDetails h1',
+        'h1', 'h2'
+    ], 'Title not found');
+
+    // ── Description ──────────────────────────────────────────
+    const summary = (() => {
+        const selectors = [
+            '[class*="JobDescription"]', '[class*="job-description"]',
+            '[class*="JobDetails__description"]', '[class*="jobDescription"]',
+            '[data-testid="job-description"]', '.job-description',
+            '[class*="Description"] p', '[class*="description"]'
+        ];
+        for (const sel of selectors) {
+            const el = document.querySelector(sel);
+            if (el) {
+                const clone = el.cloneNode(true);
+                clone.querySelectorAll('br').forEach(br => br.replaceWith('\n'));
+                clone.querySelectorAll('p, div, li').forEach(b => b.appendChild(document.createTextNode('\n')));
+                const txt = clone.textContent.trim().replace(/\n{3,}/g, '\n\n');
+                if (txt.length > 30) return txt;
+            }
+        }
+        return 'Summary not found';
+    })();
+
+    // ── Skills ───────────────────────────────────────────────
+    const skills = getArray([
+        '[class*="Skill"] span', '[class*="skill"] span',
+        '[class*="SkillTag"]', '[class*="skill-tag"]',
+        '[class*="Tag"] span', '[data-testid="skill"]',
+        '[class*="RequiredSkill"]', '[class*="required-skill"]',
+        'li[class*="skill"]'
+    ]);
+
+    // ── Budget / Rate ─────────────────────────────────────────
+    let budget = 'N/A';
+    let hourlyRate = 'N/A';
+    let jobType = 'unknown';
+
+    // Toptal primarily deals with hourly rates
+    let rawRate = getText([
+        '[class*="PayRate"]', '[class*="pay-rate"]',
+        '[class*="Rate"]', '[class*="rate"]',
+        '[class*="Salary"]', '[class*="Budget"]',
+        '[data-testid="pay-rate"]', '[data-testid="rate"]'
+    ]);
+    if (rawRate === 'N/A') rawRate = getByLabel('Rate');
+    if (rawRate === 'N/A') rawRate = getByLabel('Pay Rate');
+    if (rawRate === 'N/A') rawRate = getByLabel('Compensation');
+    if (rawRate === 'N/A') rawRate = getByLabel('Budget');
+
+    if (rawRate === 'N/A') {
+        const rawText = (searchContext.innerText || '');
+        const rateMatch = rawText.match(
+            /([\\$\u20b9\u20ac\u00a3]\s*[\d,]+(?:\.?\d{2})?\s*(?:\/\s*hr|\/\s*hour|per hour|hourly)?)/i
+        );
+        if (rateMatch) rawRate = rateMatch[1];
+    }
+
+    if (rawRate && rawRate !== 'N/A') {
+        const lower = rawRate.toLowerCase();
+        if (lower.includes('/hr') || lower.includes('/hour') || lower.includes('per hour') || lower.includes('hourly')) {
+            jobType = 'hourly';
+            hourlyRate = rawRate;
+        } else if (lower.includes('$') || lower.match(/[\d,]+/)) {
+            // Toptal often posts hourly; default to hourly if it has a number
+            jobType = 'hourly';
+            hourlyRate = rawRate;
+        }
+    }
+
+    // ── Client / Company Info ────────────────────────────────
+    const rawText = document.body.innerText || '';
+
+    const clientName = getText([
+        '[class*="CompanyName"]', '[class*="company-name"]',
+        '[class*="ClientName"]', '[class*="client-name"]',
+        '[data-testid="company-name"]',
+        '[class*="Employer"] h2', '[class*="Employer"] h3'
+    ]);
+
+    let clientLocation = getText([
+        '[class*="Location"]', '[class*="location"]',
+        '[data-testid="location"]',
+        'span[class*="Country"]', 'span[class*="country"]'
+    ]);
+    if (clientLocation === 'N/A') clientLocation = getByLabel('Location');
+    if (clientLocation === 'N/A') clientLocation = getByLabel('Country');
+
+    const clientRating = getText([
+        '[class*="Rating"]', '[class*="rating"]',
+        '[class*="Score"]', '[class*="score"]',
+        '[data-testid="rating"]'
+    ]);
+
+    const duration = getByLabel('Duration') !== 'N/A'
+        ? getByLabel('Duration')
+        : getByLabel('Engagement Length');
+
+    const experienceLevel = getByLabel('Experience Level') !== 'N/A'
+        ? getByLabel('Experience Level')
+        : getByLabel('Seniority');
+
+    const isPaymentVerified = /payment\s*verified/i.test(rawText);
+    const isPhoneVerified = /phone\s*verified/i.test(rawText);
+
+    // ── Posted Date ──────────────────────────────────────────
+    let postedOn = getText([
+        '[class*="PostedDate"]', '[class*="posted-date"]',
+        '[class*="PostDate"]', '[class*="post-date"]',
+        'time', '[datetime]'
+    ]);
+    if (postedOn === 'N/A') {
+        const timeEl = document.querySelector('time[datetime], [datetime]');
+        if (timeEl) postedOn = timeEl.getAttribute('datetime') || timeEl.innerText.trim();
+    }
+    if (postedOn === 'N/A') {
+        const m = rawText.match(/(\d+\s+(?:minute|hour|day|week|month)s?\s+ago)/i);
+        if (m) postedOn = m[1];
+    }
+    if (postedOn && postedOn !== 'N/A') {
+        const now = new Date();
+        const agoMatch = postedOn.match(/(\d+)\s+(minute|hour|day|week|month)s?\s+ago/i);
+        if (agoMatch) {
+            const val = parseInt(agoMatch[1]);
+            const unit = agoMatch[2].toLowerCase();
+            const d = new Date(now);
+            if (unit === 'minute') d.setMinutes(d.getMinutes() - val);
+            else if (unit === 'hour') d.setHours(d.getHours() - val);
+            else if (unit === 'day') d.setDate(d.getDate() - val);
+            else if (unit === 'week') d.setDate(d.getDate() - val * 7);
+            else if (unit === 'month') d.setMonth(d.getMonth() - val);
+            postedOn = d.toISOString();
+        } else {
+            const parsed = new Date(postedOn);
+            if (!isNaN(parsed.getTime())) postedOn = parsed.toISOString();
+        }
+    }
+
+    const data = {
+        jobId: window.location.href,
+        jobLink: window.location.href,
+        title,
+        summary,
+        skills,
+        attachments: [],
+        budget,
+        hourlyRate,
+        jobType,
+        projectType: jobType,
+        duration,
+        experienceLevel,
+        clientName,
+        clientLocation,
+        clientRating,
+        clientSpend: 'N/A',
+        clientJobsPosted: 'N/A',
+        clientPaymentVerified: isPaymentVerified,
+        clientPhoneVerified: isPhoneVerified,
+        postedOn
+    };
+
+    data.validation = validateJobData(data);
+    return data;
+};
+*/
+
+// ─────────────────────────────────────────────────────────────
+// Fiverr.com Extraction
+// ─────────────────────────────────────────────────────────────
+/*
+const performFiverrExtraction = () => {
+    // Fiverr gig pages — scope to the main gig content container
+    const searchContext =
+        document.querySelector(
+            '[class*="gig-page"], .gig-page-wrapper, .gig-overview, ' +
+            '[class*="GigPage"], #gig-page, main, #main'
+        ) || document;
+
+    // ── Helpers ──────────────────────────────────────────────
+    const getText = (selectors, fallback = 'N/A') => {
+        for (const sel of selectors) {
+            try {
+                for (const el of searchContext.querySelectorAll(sel)) {
+                    const t = (el.innerText || '').trim();
+                    if (t && t.length > 1) return t;
+                }
+                for (const el of document.querySelectorAll(sel)) {
+                    const t = (el.innerText || '').trim();
+                    if (t && t.length > 1) return t;
+                }
+            } catch (e) {}
+        }
+        return fallback;
+    };
+
+    const getArray = (selectors) => {
+        const items = [];
+        for (const sel of selectors) {
+            try {
+                document.querySelectorAll(sel).forEach(el => {
+                    const t = (el.innerText || '').trim();
+                    if (t && !items.includes(t) && t.length > 1 && t.length < 60 && !t.includes('\n'))
+                        items.push(t);
+                });
+                if (items.length > 0) break;
+            } catch (e) {}
+        }
+        return items;
+    };
+
+    const getByLabel = (labelName, fallback = 'N/A') => {
+        const lower = labelName.toLowerCase();
+        for (const node of document.querySelectorAll('span, div, p, label, dt, li, td, strong, h4, h5')) {
+            const nt = (node.innerText || '').trim().toLowerCase();
+            if (nt === lower || (nt.startsWith(lower) && nt.length < lower.length + 4)) {
+                let val = node.nextElementSibling;
+                if (val && (val.innerText || '').trim()) return val.innerText.trim();
+                if (node.parentElement) {
+                    val = node.parentElement.nextElementSibling;
+                    if (val && (val.innerText || '').trim()) return val.innerText.trim();
+                }
+            }
+        }
+        return fallback;
+    };
+
+    // ── Title ────────────────────────────────────────────────
+    // On Fiverr, the gig title is the "service" name shown at top
+    const title = getText([
+        'h1.gig-title', '[class*="gig-title"]', '[class*="gigTitle"]',
+        '[class*="GigTitle"]', 'h1[class*="title"]',
+        '[data-testid="gig-title"]', 'h1'
+    ], 'Title not found');
+
+    // ── Description ──────────────────────────────────────────
+    const summary = (() => {
+        const selectors = [
+            '[class*="gig-description"]', '[class*="gigDescription"]',
+            '[class*="GigDescription"]', '.description-content',
+            '[data-testid="gig-description"]', '.gig-page-description',
+            '[class*="overview-description"]'
+        ];
+        for (const sel of selectors) {
+            const el = document.querySelector(sel);
+            if (el) {
+                const clone = el.cloneNode(true);
+                clone.querySelectorAll('br').forEach(br => br.replaceWith('\n'));
+                clone.querySelectorAll('p, div, li').forEach(b => b.appendChild(document.createTextNode('\n')));
+                const txt = clone.textContent.trim().replace(/\n{3,}/g, '\n\n');
+                if (txt.length > 30) return txt;
+            }
+        }
+        return 'Summary not found';
+    })();
+
+    // ── Skills / Tags ─────────────────────────────────────────
+    // Fiverr uses category tags and gig tags rather than skills
+    const skills = getArray([
+        '[class*="gig-tags"] a', '[class*="gigTags"] a',
+        '[class*="tag-link"]', '[class*="TagLink"]',
+        'a[class*="tag"]', '[data-testid="gig-tag"]',
+        '[class*="Tags"] a', '[class*="tags"] a',
+        '[class*="category"] a'
+    ]);
+
+    // ── Pricing / Budget ──────────────────────────────────────
+    // Fiverr packages: Basic / Standard / Premium with prices
+    let budget = 'N/A';
+    let hourlyRate = 'N/A';
+    let jobType = 'fixed'; // Fiverr is always fixed-price
+
+    // Try to grab the starting price (Basic package)
+    const priceEl = document.querySelector(
+        '[class*="price-value"]:first-child, [class*="priceValue"]:first-child, ' +
+        '[class*="package-price"]:first-child, [class*="packagePrice"]:first-child, ' +
+        '.basic-price, [data-testid="basic-price"], [data-testid="package-price"]'
+    );
+    let rawPrice = priceEl ? (priceEl.innerText || '').trim() : '';
+
+    if (!rawPrice) {
+        // Grab all prices and take the first (cheapest)
+        const allPrices = document.querySelectorAll(
+            '[class*="price-value"], [class*="priceValue"], [class*="package-price"]'
+        );
+        if (allPrices.length > 0) rawPrice = (allPrices[0].innerText || '').trim();
+    }
+
+    if (!rawPrice) rawPrice = getByLabel('Starting at');
+    if (!rawPrice || rawPrice === 'N/A') {
+        // Regex on scoped context
+        const m = (searchContext.innerText || '').match(/([\\$\u20b9\u20ac\u00a3]\s*[\d,]+(?:\.\d{2})?)/);
+        if (m) rawPrice = m[1];
+    }
+
+    if (rawPrice && rawPrice !== 'N/A') {
+        budget = rawPrice;
+    }
+
+    // ── Seller Info ───────────────────────────────────────────
+    const rawText = document.body.innerText || '';
+
+    // Seller name = "client" equivalent on Fiverr
+    const clientName = getText([
+        '[class*="seller-name"]', '[class*="sellerName"]',
+        '[class*="SellerName"]', '[data-testid="seller-name"]',
+        '.seller-card-username', '[class*="username"]',
+        'a[class*="username"]'
+    ]);
+
+    // Seller location
+    let clientLocation = getText([
+        '[class*="seller-location"]', '[class*="sellerLocation"]',
+        '[data-testid="seller-location"]', '[class*="Location"]'
+    ]);
+    if (clientLocation === 'N/A') clientLocation = getByLabel('From');
+
+    // Seller rating
+    let clientRating = getText([
+        '[class*="rating-score"]', '[class*="ratingScore"]',
+        '[class*="seller-rating"]', '[data-testid="rating"]',
+        '[class*="avg-rating"]', '.gig-rating'
+    ]);
+    if (clientRating === 'N/A') {
+        const rm = rawText.match(/([\d.]+)\s*\(\s*[\d,]+\s*reviews?\s*\)/i);
+        if (rm) clientRating = rm[0];
+    }
+
+    // Seller total orders / reviews as proxy for "jobs posted"
+    const clientJobsPosted = getText([
+        '[class*="reviews-count"]', '[class*="reviewsCount"]',
+        '[class*="orders-count"]', '[data-testid="reviews-count"]',
+        '[class*="total-reviews"]'
+    ]);
+
+    // Seller level (e.g. "Level 2", "Top Rated")
+    const experienceLevel = getText([
+        '[class*="seller-level"]', '[class*="sellerLevel"]',
+        '[class*="SellerLevel"]', '[data-testid="seller-level"]',
+        '[class*="level-badge"]', '[class*="badge-title"]'
+    ]);
+
+    const isPaymentVerified = /payment\s*verified/i.test(rawText) || /verified/i.test(rawText);
+    const isPhoneVerified = /phone\s*verified/i.test(rawText);
+
+    // ── Delivery Time as Duration ─────────────────────────────
+    const duration = getText([
+        '[class*="delivery-time"]', '[class*="deliveryTime"]',
+        '[data-testid="delivery-time"]', '[class*="delivery"] span'
+    ]) !== 'N/A'
+        ? getText(['[class*="delivery-time"]', '[class*="deliveryTime"]', '[data-testid="delivery-time"]'])
+        : getByLabel('Delivery Time');
+
+    // ── Posted / Member Since ─────────────────────────────────
+    let postedOn = getText([
+        '[class*="member-since"]', '[class*="memberSince"]',
+        '[data-testid="member-since"]', 'time', '[datetime]'
+    ]);
+    if (postedOn === 'N/A') {
+        const timeEl = document.querySelector('time[datetime]');
+        if (timeEl) postedOn = timeEl.getAttribute('datetime') || timeEl.innerText.trim();
+    }
+    if (postedOn && postedOn !== 'N/A') {
+        const parsed = new Date(postedOn);
+        if (!isNaN(parsed.getTime())) postedOn = parsed.toISOString();
+    }
+
+    const data = {
+        jobId: window.location.href,
+        jobLink: window.location.href,
+        title,
+        summary,
+        skills,
+        attachments: [],
+        budget,
+        hourlyRate,
+        jobType,
+        projectType: 'fixed',
+        duration,
+        experienceLevel,
+        clientName,
+        clientLocation,
+        clientRating,
+        clientSpend: 'N/A',
+        clientJobsPosted,
+        clientPaymentVerified: isPaymentVerified,
+        clientPhoneVerified: isPhoneVerified,
+        postedOn
+    };
+
+    data.validation = validateJobData(data);
+    return data;
+};
+*/
+
 const extractors = {
     upwork: performUpworkExtraction,
-    freelancer: performFreelancerExtraction
+    freelancer: performFreelancerExtraction,
+    guru: performGuruExtraction,
+    // toptal: performToptalExtraction,
+    // fiverr: performFiverrExtraction
 };
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {

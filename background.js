@@ -440,13 +440,18 @@ async function syncJobToBackend(jobData, proposal, score, templateUsed) {
     return { success: false, error: 'NO_AUTH' };
   }
 
-  const platform = jobData.jobLink.includes('freelancer.com') ? 'Freelancer' : 'Upwork';
+  let platform = 'Upwork';
+  const jobLink = jobData.jobLink || jobData.url || '';
+  if (jobLink.includes('freelancer.com')) platform = 'Freelancer';
+  else if (jobLink.includes('guru.com')) platform = 'Guru';
+  
   const leadPayload = {
     tenant_id: tenantId,
     title: jobData.title,
     summary: jobData.summary,
     skills: jobData.skills || [],
     jobLink: jobData.jobLink,
+    platform: platform,
     clientName: `${platform} Client (${jobData.clientLocation || 'Global'})`,
     clientMail: `client@${platform.toLowerCase()}.com`,
     clientLocation: jobData.clientLocation,

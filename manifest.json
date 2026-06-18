@@ -17,6 +17,9 @@
   "host_permissions": [
     "https://www.upwork.com/*",
     "https://www.freelancer.com/*",
+    "https://www.guru.com/*",
+    "https://www.toptal.com/*",
+    "https://www.fiverr.com/*",
     "http://localhost:5001/*",
     "https://zithmi.zithspace.com/*"
   ],
@@ -32,7 +35,10 @@
     {
       "matches": [
         "https://www.upwork.com/*",
-        "https://www.freelancer.com/*"
+        "https://www.freelancer.com/*",
+        "https://www.guru.com/*",
+        "https://www.toptal.com/*",
+        "https://www.fiverr.com/*"
       ],
       "js": [
         "content.js"
