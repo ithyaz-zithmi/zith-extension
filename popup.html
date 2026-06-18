@@ -94,13 +94,12 @@
         style="margin: 0 auto 20px; width: 64px; height: 64px; background: #EEF2FF; color: var(--primary); border-radius: 20px; display: flex; align-items: center; justify-content: center; font-size: 28px;">
         🔍
       </div>
-      <p id="idleInstructions" class="text-muted" style="margin-bottom: 24px;">Navigate to an Upwork job page to begin.
+      <p id="idleInstructions" class="text-muted" style="margin-bottom: 24px;">Navigate to an Upwork, Freelancer, or Guru job page to begin.<br>Toptal coming soon
       </p>
 
       <div id="wrongPageMsg" class="hidden" style="text-align: center; margin-bottom: 24px;">
         <p style="color: var(--danger); font-weight: 600; margin-bottom: 8px;">Wrong Page</p>
-        <p class="text-muted" style="font-size: 13px; line-height: 1.5;">Please navigate to an active Upwork or
-          Freelancer job page to use the extractor.</p>
+        <p class="text-muted" style="font-size: 13px; line-height: 1.5;">Please navigate to an active job page on Upwork, Freelancer, or Guru to use the extractor. (Toptal coming soon)</p>
       </div>
 
       <div style="display: flex; flex-direction: column; gap: 12px; align-items: center;">
@@ -200,6 +199,26 @@
             <div class="detail-item">
               <span class="detail-label">📞 Identity</span>
               <span class="detail-value" id="clientPhoneStat">Unverified</span>
+            </div>
+            <div class="detail-item hidden" id="clientSpendWrap">
+              <span class="detail-label">💵 Total Spend</span>
+              <span class="detail-value" id="clientSpend">N/A</span>
+            </div>
+            <div class="detail-item hidden" id="clientJobsPostedWrap">
+              <span class="detail-label">💼 Jobs Posted</span>
+              <span class="detail-value" id="clientJobsPosted">N/A</span>
+            </div>
+            <div class="detail-item hidden" id="clientJobsPaidWrap">
+              <span class="detail-label">✅ Jobs Paid</span>
+              <span class="detail-value" id="clientJobsPaid">N/A</span>
+            </div>
+            <div class="detail-item hidden" id="clientPaidInvoicesWrap">
+              <span class="detail-label">📄 Paid Invoices</span>
+              <span class="detail-value" id="clientPaidInvoices">N/A</span>
+            </div>
+            <div class="detail-item hidden" id="clientOutstandingInvoicesWrap">
+              <span class="detail-label">⏳ Outstanding</span>
+              <span class="detail-value" id="clientOutstandingInvoices">N/A</span>
             </div>
           </div>
         </div>

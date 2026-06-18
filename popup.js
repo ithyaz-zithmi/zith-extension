@@ -525,16 +525,17 @@ document.addEventListener('DOMContentLoaded', () => {
   let userSettings = null;
   let lastSavedLeadId = null;
 
-  chrome.storage.local.get(['settings', 'authToken', 'cachedUserSkills_upwork', 'cachedUserSkills_freelancer', 'cachedUserSkills'], (result) => {
+  chrome.storage.local.get(['settings', 'authToken', 'cachedUserSkills_upwork', 'cachedUserSkills_freelancer', 'cachedUserSkills_guru', 'cachedUserSkills'], (result) => {
     console.log('Popup - Storage result:', result);
     
     const settings = result.settings || {};
     const authToken = result.authToken || null;
     const hasUpworkSkills = result.cachedUserSkills_upwork && result.cachedUserSkills_upwork.length > 0;
     const hasFreelancerSkills = result.cachedUserSkills_freelancer && result.cachedUserSkills_freelancer.length > 0;
+    const hasGuruSkills = result.cachedUserSkills_guru && result.cachedUserSkills_guru.length > 0;
     const hasGenericSkills = result.cachedUserSkills && result.cachedUserSkills.length > 0;
 
-    if (hasUpworkSkills || hasFreelancerSkills || hasGenericSkills) {
+    if (hasUpworkSkills || hasFreelancerSkills || hasGuruSkills || hasGenericSkills) {
       const syncBtn = document.getElementById('syncProfileBtn');
       if (syncBtn) syncBtn.innerText = '🔄 Update the skills';
     }
@@ -587,12 +588,27 @@ document.addEventListener('DOMContentLoaded', () => {
                        url.includes('upwork.com/nx/search/jobs/details/');
       const isFreelancer = url.includes('freelancer.com/projects/') || 
                            url.includes('freelancer.com/jobs/');
+      const isGuru = url.includes('guru.com/jobs/') ||
+                     url.includes('guru.com/job/') ||
+                     url.includes('guru.com/freelancers/') ||
+                     url.includes('guru.com/work/');
+      /*
+      const isToptal = url.includes('toptal.com/jobs/') ||
+                       url.includes('toptal.com/job/') ||
+                       url.includes('toptal.com/developers/') ||
+                       url.includes('toptal.com/finance/') ||
+                       url.includes('toptal.com/project-managers/');
+      const isFiverr = url.includes('fiverr.com/') && (
+                       url.includes('/gig/') ||
+                       url.split('/').filter(Boolean).length >= 3 // seller/gig-slug paths
+                     );
+      */
 
       const extractBtn = document.getElementById('extractBtn');
       const wrongPageMsg = document.getElementById('wrongPageMsg');
       const idleInstructions = document.getElementById('idleInstructions');
 
-      if (isUpwork || isFreelancer) {
+      if (isUpwork || isFreelancer || isGuru) {
         if (extractBtn) extractBtn.classList.remove('hidden');
         if (wrongPageMsg) wrongPageMsg.classList.add('hidden');
         if (idleInstructions) idleInstructions.classList.remove('hidden');
@@ -663,7 +679,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     chrome.tabs.sendMessage(tab.id, { action: "extractJob" }, (response) => {
       extractBtn.disabled = false;
-      if (chrome.runtime.lastError) return setExtractorState('error', 'Could not sync. Ensure you are on an active job page (Upwork or Freelancer).');
+      if (chrome.runtime.lastError) return setExtractorState('error', 'Could not sync. Ensure you are on an active job page (Upwork, Freelancer, or Guru).');
       if (response && response.success) {
         currentJobData = response.data;
         populateExtractedJob(currentJobData);
@@ -884,6 +900,57 @@ document.addEventListener('DOMContentLoaded', () => {
     // Expanded Metadata
     document.getElementById('clientLocation').innerText = data.clientLocation;
     document.getElementById('clientRating').innerText = data.clientRating;
+
+    // Populate and show/hide optional Client Insights
+    const spendWrap = document.getElementById('clientSpendWrap');
+    if (spendWrap) {
+      if (data.clientSpend && data.clientSpend !== 'N/A') {
+        document.getElementById('clientSpend').innerText = data.clientSpend;
+        spendWrap.classList.remove('hidden');
+      } else {
+        spendWrap.classList.add('hidden');
+      }
+    }
+
+    const jobsPostedWrap = document.getElementById('clientJobsPostedWrap');
+    if (jobsPostedWrap) {
+      if (data.clientJobsPosted && data.clientJobsPosted !== 'N/A') {
+        document.getElementById('clientJobsPosted').innerText = data.clientJobsPosted;
+        jobsPostedWrap.classList.remove('hidden');
+      } else {
+        jobsPostedWrap.classList.add('hidden');
+      }
+    }
+
+    const jobsPaidWrap = document.getElementById('clientJobsPaidWrap');
+    if (jobsPaidWrap) {
+      if (data.clientJobsPaid && data.clientJobsPaid !== 'N/A') {
+        document.getElementById('clientJobsPaid').innerText = data.clientJobsPaid;
+        jobsPaidWrap.classList.remove('hidden');
+      } else {
+        jobsPaidWrap.classList.add('hidden');
+      }
+    }
+
+    const paidInvoicesWrap = document.getElementById('clientPaidInvoicesWrap');
+    if (paidInvoicesWrap) {
+      if (data.clientPaidInvoices && data.clientPaidInvoices !== 'N/A') {
+        document.getElementById('clientPaidInvoices').innerText = data.clientPaidInvoices;
+        paidInvoicesWrap.classList.remove('hidden');
+      } else {
+        paidInvoicesWrap.classList.add('hidden');
+      }
+    }
+
+    const outstandingInvoicesWrap = document.getElementById('clientOutstandingInvoicesWrap');
+    if (outstandingInvoicesWrap) {
+      if (data.clientOutstandingInvoices && data.clientOutstandingInvoices !== 'N/A') {
+        document.getElementById('clientOutstandingInvoices').innerText = data.clientOutstandingInvoices;
+        outstandingInvoicesWrap.classList.remove('hidden');
+      } else {
+        outstandingInvoicesWrap.classList.add('hidden');
+      }
+    }
 
     // Custom logic for grid badge validations
     const payEl = document.getElementById('clientPaymentStat');
@@ -1343,12 +1410,19 @@ function normalizeUrl(url) {
     const idsToClear = [
       'jobTitleDisplay', 'uiJobLink', 'jobBudgetWrap', 
       'jobProjectTypeWrap', 'clientLocation', 'clientRating',
-      'postedTime', 'jobDurationWrap', 'jobExperienceWrap'
+      'postedTime', 'jobDurationWrap', 'jobExperienceWrap',
+      'clientSpend', 'clientJobsPosted', 'clientJobsPaid',
+      'clientPaidInvoices', 'clientOutstandingInvoices'
     ];
     
     idsToClear.forEach(id => {
       const el = document.getElementById(id);
       if (el) el.innerText = '...';
+    });
+
+    ['clientSpendWrap', 'clientJobsPostedWrap', 'clientJobsPaidWrap', 'clientPaidInvoicesWrap', 'clientOutstandingInvoicesWrap'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.classList.add('hidden');
     });
 
     // Clear specific elements
@@ -1408,7 +1482,8 @@ function normalizeUrl(url) {
         }
 
         if (res && res.success) {
-          const platform = res.platform || 'General';
+          const rawPlatform = res.platform || 'General';
+          const platform = rawPlatform.charAt(0).toUpperCase() + rawPlatform.slice(1);
           console.log(`Extracted ${res.count} skills for ${platform}, syncing to backend...`);
           
           // Send to background for backend sync
