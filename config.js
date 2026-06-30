@@ -5,19 +5,33 @@
 const ENVIRONMENTS = {
   development: {
     API_BASE_URL: 'http://localhost:5001/api',
-    DASHBOARD_BASE_URL: 'http://localhost:3005',
-    SKILLS_URL: 'http://localhost:3005/skills',
-    LEADS_URL: 'http://localhost:3005/leads',
     PORT: 5001
   },
   production: {
     API_BASE_URL: 'https://zithmi.zithspace.com/api',
-    DASHBOARD_BASE_URL: 'https://zithmi.zithspace.com',
-    SKILLS_URL: 'https://zithmi.zithspace.com/skills',
-    LEADS_URL: 'https://zithmi.zithspace.com/leads',
     PORT: (typeof process !== 'undefined' && process.env && process.env.PORT) || 5001
   }
 };
+
+// Get dynamic tenant-based frontend URLs
+function getTenantUrls(tenantSlug) {
+  const isDevelopment = detectEnvironment() === 'development';
+  if (isDevelopment) {
+    return {
+      DASHBOARD_BASE_URL: 'http://localhost:3005',
+      SKILLS_URL: 'http://localhost:3005/skills',
+      LEADS_URL: 'http://localhost:3005/leads'
+    };
+  }
+  
+  // Fallback to default if no slug is provided
+  const slug = tenantSlug || 'zithmi';
+  return {
+    DASHBOARD_BASE_URL: `https://${slug}.zithspace.com`,
+    SKILLS_URL: `https://${slug}.zithspace.com/skills`,
+    LEADS_URL: `https://${slug}.zithspace.com/leads`
+  };
+}
 
 // Function to detect current environment
 function detectEnvironment() {
@@ -58,11 +72,12 @@ const CONFIG = getConfig();
 
 // For Node.js environments (like server.js)
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { ENVIRONMENTS, detectEnvironment, getConfig, CONFIG };
+  module.exports = { ENVIRONMENTS, detectEnvironment, getConfig, CONFIG, getTenantUrls };
 }
 
 // For Chrome extension environment
 if (typeof window !== 'undefined') {
   window.CONFIG = CONFIG;
   window.ENVIRONMENTS = ENVIRONMENTS;
+  window.getTenantUrls = getTenantUrls;
 }

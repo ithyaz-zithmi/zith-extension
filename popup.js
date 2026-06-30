@@ -322,11 +322,10 @@ function showToast(msg) {
 // Handle login
 async function handleLogin(email, password) {
   try {
-    const response = await fetch(`${CONFIG.API_BASE_URL}/auth/login`, {
+    const response = await fetch(`${CONFIG.API_BASE_URL}/auth/extension-login`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'x-tenant-id': 'b85c1b5b-77a3-4281-9147-51d6bd3ee94d'
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({ email, password })
     });
@@ -555,15 +554,17 @@ document.addEventListener('DOMContentLoaded', () => {
   // Quick Actions
   document.getElementById('dashboardBtn').addEventListener('click', (e) => {
     e.preventDefault();
-    const dashboardUrl = CONFIG.LEADS_URL;
+    const tenantUrls = window.getTenantUrls(currentUser?.tenantSlug);
+    const dashboardUrl = tenantUrls.LEADS_URL;
     window.open(dashboardUrl, '_blank');
   });
 
   document.getElementById('viewInDashboardBtn').addEventListener('click', (e) => {
     e.preventDefault();
+    const tenantUrls = window.getTenantUrls(currentUser?.tenantSlug);
     const url = lastSavedLeadId 
-      ? `${CONFIG.DASHBOARD_BASE_URL}/leads/view/${lastSavedLeadId}` 
-      : CONFIG.LEADS_URL;
+      ? `${tenantUrls.DASHBOARD_BASE_URL}/leads/view/${lastSavedLeadId}` 
+      : tenantUrls.LEADS_URL;
     window.open(url, '_blank');
   });
 
@@ -737,46 +738,52 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function checkDuplicate(url) {
-    chrome.storage.local.get(null, (items) => {
-      const allSavedJobs = [];
-      Object.keys(items).forEach(key => {
-        if (key.startsWith('jobs_')) {
-          allSavedJobs.push(...items[key]);
-        }
-      });
+    chrome.storage.local.get(['currentUser', 'authToken'], (authData) => {
+      const user = authData.currentUser;
+      const authToken = authData.authToken;
+      const tenantId = authToken ? extractTenantFromJWT(authToken) : null;
       
-      const normalizedUrl = normalizeUrl(url);
-      const isDuplicate = allSavedJobs.some(j => {
-        const jLink = normalizeUrl(j.jobLink || j.url || j.id);
-        return jLink === normalizedUrl || j.id === url || j.jobId === url;
+      if (!user || (!user.id && !user._id) || !tenantId) return;
+
+      const userId = user.id || user._id;
+      const storageKey = `jobs_${tenantId}_${userId}`;
+
+      chrome.storage.local.get([storageKey], (data) => {
+        const allSavedJobs = data[storageKey] || [];
+        
+        const normalizedUrl = normalizeUrl(url);
+        const isDuplicate = allSavedJobs.some(j => {
+          const jLink = normalizeUrl(j.jobLink || j.url || j.id);
+          return jLink === normalizedUrl || j.id === url || j.jobId === url;
+        });
+
+        const warningEl = document.getElementById('duplicateWarning');
+        const fixedSaveContainer = document.getElementById('fixedSaveBtn');
+        const saveBtn = document.getElementById('saveBtn');
+
+        if (isDuplicate) {
+          warningEl.classList.remove('hidden');
+          if (fixedSaveContainer) {
+            fixedSaveContainer.classList.remove('hidden'); // Show it
+          }
+          if (saveBtn) {
+            saveBtn.innerText = "Job Already in Zukvo";
+            saveBtn.disabled = true;
+            saveBtn.classList.replace('success-btn', 'secondary-btn');
+            saveBtn.style.opacity = '0.6';
+            saveBtn.style.cursor = 'not-allowed';
+          }
+        } else {
+          warningEl.classList.add('hidden');
+          if (saveBtn) {
+            saveBtn.innerText = "Save Job & Proposal";
+            saveBtn.disabled = false;
+            saveBtn.classList.add('success-btn');
+            saveBtn.classList.remove('secondary-btn');
+            saveBtn.style.opacity = '1';
+          }
+        }
       });
-
-      const warningEl = document.getElementById('duplicateWarning');
-      const fixedSaveContainer = document.getElementById('fixedSaveBtn');
-      const saveBtn = document.getElementById('saveBtn');
-
-      if (isDuplicate) {
-        warningEl.classList.remove('hidden');
-        if (fixedSaveContainer) {
-          fixedSaveContainer.classList.remove('hidden'); // Show it
-        }
-        if (saveBtn) {
-          saveBtn.innerText = "Job Already in Zukvo";
-          saveBtn.disabled = true;
-          saveBtn.classList.replace('success-btn', 'secondary-btn');
-          saveBtn.style.opacity = '0.6';
-          saveBtn.style.cursor = 'not-allowed';
-        }
-      } else {
-        warningEl.classList.add('hidden');
-        if (saveBtn) {
-          saveBtn.innerText = "Save Job & Proposal";
-          saveBtn.disabled = false;
-          saveBtn.classList.add('success-btn');
-          saveBtn.classList.remove('secondary-btn');
-          saveBtn.style.opacity = '1';
-        }
-      }
     });
   }
 
@@ -1218,7 +1225,7 @@ function normalizeUrl(url) {
               <select class="status-select" data-id="${job.id || job.jobId}" style="font-size: 11px; padding: 4px 8px; height: auto; width: auto; border-radius: 4px;">
                 ${statuses.map(s => `<option value="${s.id}" ${job.status === s.id ? 'selected' : ''}>${s.label}</option>`).join('')}
               </select>
-              ${job.leadId ? `<a href="${CONFIG.DASHBOARD_BASE_URL}/leads/view/${job.leadId}" target="_blank" class="outline-btn" style="padding: 4px 8px; font-size: 10px; text-decoration: none; color: var(--primary); border-color: var(--primary);">🌐 Open on Zukvo</a>` : ''}
+              ${job.leadId ? `<a href="${window.getTenantUrls(currentUser?.tenantSlug).DASHBOARD_BASE_URL}/leads/view/${job.leadId}" target="_blank" class="outline-btn" style="padding: 4px 8px; font-size: 10px; text-decoration: none; color: var(--primary); border-color: var(--primary);">🌐 Open on Zukvo</a>` : ''}
             </div>
             <button class="outline-btn danger-btn delete-job-btn" data-id="${job.id || job.jobId}" style="padding: 4px 10px; font-size: 11px;">Delete</button>
           </div>

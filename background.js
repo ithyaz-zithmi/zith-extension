@@ -124,15 +124,18 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.action === 'saveJob') {
-    chrome.storage.local.get(['currentUser'], async (authData) => {
+    chrome.storage.local.get(['currentUser', 'authToken'], async (authData) => {
       const user = authData.currentUser;
-      if (!user || (!user.id && !user._id)) {
+      const authToken = authData.authToken;
+      const tenantId = authToken ? extractTenantFromJWT(authToken) : null;
+      
+      if (!user || (!user.id && !user._id) || !tenantId) {
         sendResponse({ success: false, message: 'Please login to save jobs.' });
         return;
       }
 
       const userId = user.id || user._id;
-      const storageKey = `jobs_${userId}`;
+      const storageKey = `jobs_${tenantId}_${userId}`;
 
       chrome.storage.local.get([storageKey], async (data) => {
         let jobs = data[storageKey] || [];
@@ -227,26 +230,32 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.action === 'getJobs') {
-    chrome.storage.local.get(['currentUser'], (authData) => {
+    chrome.storage.local.get(['currentUser', 'authToken'], (authData) => {
       const user = authData.currentUser;
-      if (!user || (!user.id && !user._id)) {
+      const authToken = authData.authToken;
+      const tenantId = authToken ? extractTenantFromJWT(authToken) : null;
+
+      if (!user || (!user.id && !user._id) || !tenantId) {
         sendResponse({ success: true, jobs: [] });
         return;
       }
       const userId = user.id || user._id;
-      const storageKey = `jobs_${userId}`;
+      const storageKey = `jobs_${tenantId}_${userId}`;
       chrome.storage.local.get([storageKey], (data) => sendResponse({ success: true, jobs: data[storageKey] || [] }));
     });
     return true;
   }
 
   if (request.action === 'updateJobStatus') {
-    chrome.storage.local.get(['currentUser'], (authData) => {
+    chrome.storage.local.get(['currentUser', 'authToken'], (authData) => {
       const user = authData.currentUser;
-      if (!user) { sendResponse({ success: false, message: 'Not logged in' }); return; }
+      const authToken = authData.authToken;
+      const tenantId = authToken ? extractTenantFromJWT(authToken) : null;
+
+      if (!user || !tenantId) { sendResponse({ success: false, message: 'Not logged in' }); return; }
 
       const userId = user.id || user._id;
-      const storageKey = `jobs_${userId}`;
+      const storageKey = `jobs_${tenantId}_${userId}`;
 
       chrome.storage.local.get([storageKey], (data) => {
         let jobs = data[storageKey] || [];
@@ -265,12 +274,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.action === 'deleteJob') {
-    chrome.storage.local.get(['currentUser'], (authData) => {
+    chrome.storage.local.get(['currentUser', 'authToken'], (authData) => {
       const user = authData.currentUser;
-      if (!user) { sendResponse({ success: false, message: 'Not logged in' }); return; }
+      const authToken = authData.authToken;
+      const tenantId = authToken ? extractTenantFromJWT(authToken) : null;
+
+      if (!user || !tenantId) { sendResponse({ success: false, message: 'Not logged in' }); return; }
 
       const userId = user.id || user._id;
-      const storageKey = `jobs_${userId}`;
+      const storageKey = `jobs_${tenantId}_${userId}`;
 
       chrome.storage.local.get([storageKey], (data) => {
         let jobs = data[storageKey] || [];
@@ -284,12 +296,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.action === 'retrySync') {
-    chrome.storage.local.get(['currentUser'], (authData) => {
+    chrome.storage.local.get(['currentUser', 'authToken'], (authData) => {
       const user = authData.currentUser;
-      if (!user) { sendResponse({ success: false, message: 'Not logged in' }); return; }
+      const authToken = authData.authToken;
+      const tenantId = authToken ? extractTenantFromJWT(authToken) : null;
+
+      if (!user || !tenantId) { sendResponse({ success: false }); return; }
 
       const userId = user.id || user._id;
-      const storageKey = `jobs_${userId}`;
+      const storageKey = `jobs_${tenantId}_${userId}`;
 
       chrome.storage.local.get([storageKey], async (data) => {
         let jobs = data[storageKey] || [];

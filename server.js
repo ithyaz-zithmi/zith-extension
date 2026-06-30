@@ -57,10 +57,10 @@ const authenticateToken = (req, res, next) => {
 };
 
 /**
- * Mock Login
- * POST /api/auth/login
+ * Mock Extension Login
+ * POST /api/auth/extension-login
  */
-app.post('/api/auth/login', (req, res) => {
+app.post('/api/auth/extension-login', (req, res) => {
   const { email, password } = req.body;
 
   if (!email || !password) {
@@ -68,7 +68,8 @@ app.post('/api/auth/login', (req, res) => {
   }
 
   const mockTenantId = Buffer.from(email).toString('hex').substring(0, 12);
-  const user = { id: 'u123', email, name: 'Test User', tenantId: mockTenantId };
+  const tenantSlug = email.split('@')[1]?.split('.')[0] || 'default';
+  const user = { id: 'u123', email, name: 'Test User', tenantId: mockTenantId, tenantSlug };
   const accessToken = jwt.sign(user, JWT_SECRET, { expiresIn: '24h' });
 
   res.json({ success: true, accessToken, user });
